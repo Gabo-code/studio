@@ -44,6 +44,11 @@ export function CheckInForm() {
     }
   }, [persistentId]);
 
+  const handleSelfieCaptured = (dataUrl: string | null) => {
+    setSelfieDataUrl(dataUrl);
+    setShowSelfieCapture(false); // Hide the selfie capture UI after capture or cancel
+  };
+
   const handleCheckIn = async (e: FormEvent) => {
     e.preventDefault();
     if (!persistentId) {
@@ -134,7 +139,7 @@ export function CheckInForm() {
       <div className="space-y-2">
         <Label className="text-lg font-medium flex items-center"><Camera className="mr-2 h-5 w-5 text-primary" />Selfie</Label>
         {showSelfieCapture ? (
-          <SelfieCapture onSelfieCaptured={setSelfieDataUrl} onCancel={() => setShowSelfieCapture(false)} />
+          <SelfieCapture onSelfieCaptured={handleSelfieCaptured} onCancel={() => setShowSelfieCapture(false)} />
         ) : (
           <Button type="button" variant="outline" onClick={() => setShowSelfieCapture(true)} className="w-full py-3">
             <Camera className="mr-2 h-4 w-4" /> Take Selfie
