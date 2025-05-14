@@ -1,6 +1,6 @@
 import type { WaitingDriver, DispatchRecord, Driver, FraudAlert } from '@/types';
 
-// This is a very simple in-memory store, ideally backed by localStorage for some persistence or Zustand for better state management.
+// This is a very simple in-memory store, ideally backed by localStorage for some persistence or Zustand for better state management. // This is a very simple in-memory store, ideally backed by localStorage for some persistence or Zustand for better state management.
 // For a real app, this would be Firebase.
 
 interface AppState {
@@ -151,3 +151,5 @@ saveState = () => {
   originalSaveState();
   notify();
 };
+
+export type { AppState, WaitingDriver, DispatchRecord, Driver, FraudAlert };

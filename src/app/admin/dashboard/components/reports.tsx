@@ -36,7 +36,7 @@ export function Reports() {
           format(new Date(r.checkInTime), "yyyy-MM-dd HH:mm:ss"),
           format(new Date(r.checkoutTime), "yyyy-MM-dd HH:mm:ss"),
           r.bags,
-          `"${r.commune.replace(/"/g, '""')}"`,
+          `"${String(r.commune).replace(/"/g, '""')}"`,
           r.selfieDataUrl ? 'Yes' : 'No',
           r.location?.latitude || '',
           r.location?.longitude || ''
