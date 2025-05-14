@@ -10,90 +10,167 @@ import { store, subscribe } from '@/lib/store'; // Import subscribe explicitly
 import type { WaitingDriver, DispatchRecord, FraudAlert } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-// import { AlertTriangle } from 'lucide-react'; // Duplicate import
-export function CoordinatorDashboardClient() {
-  const { isLoading, isAuthenticated, role } = useAuthCheck('coordinator');
-  const router = useRouter(); // Use the imported subscribe function
+import { supabase } from '@/lib/supabase';
 
-  const [waitingDrivers, setWaitingDrivers] = useState<WaitingDriver[]>(store.getWaitingDrivers());
+// Interfaces para mapear los datos de Supabase
+interface DriverRecord {
+  id: string;
+  driver_id: string;
+  name: string;
+  start_time: string;
+  status: string;
+  selfie_url?: string;
+  pid?: string;
+}
+
+export function CoordinatorDashboardClient() {
+  const { isLoading: authLoading, isAuthenticated, role } = useAuthCheck('coordinator');
+  const router = useRouter();
+
+  const [activeDrivers, setActiveDrivers] = useState<DriverRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [fraudAlerts, setFraudAlerts] = useState<FraudAlert[]>(store.getFraudAlerts());
 
-  const refreshData = useCallback(() => {
-    setWaitingDrivers(store.getWaitingDrivers());
-    setFraudAlerts(store.getFraudAlerts());
+  // Cargar conductores activos desde Supabase
+  const loadActiveDrivers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('dispatch_records')
+        .select(`
+          id,
+          driver_id,
+          name,
+          start_time,
+          status,
+          selfie_url,
+          pid
+        `)
+        .eq('status', 'en_curso')
+        .order('start_time', { ascending: true });
+      
+      if (error) {
+        console.error('Error cargando conductores activos:', error);
+      } else {
+        setActiveDrivers(data || []);
+      }
+    } catch (err) {
+      console.error('Error al cargar datos:', err);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
-  
-  useEffect(() => {
-    refreshData(); // Initial load
-    const unsubscribe = subscribe(refreshData); // Use the imported subscribe function
-    return () => unsubscribe();
-  }, [refreshData]);
 
+  // Cargar datos al inicio y refrescar cada 30 segundos
+  useEffect(() => {
+    loadActiveDrivers();
+    
+    const interval = setInterval(loadActiveDrivers, 30000);
+    return () => clearInterval(interval);
+  }, [loadActiveDrivers]);
+
+  // Cargar alertas de fraude del store
+  useEffect(() => {
+    setFraudAlerts(store.getFraudAlerts());
+    const unsubscribe = subscribe(() => {
+      setFraudAlerts(store.getFraudAlerts());
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleLogout = () => {
     logout();
     router.replace('/coordinator/login');
   };
 
-  const handleCheckoutDriver = (driverId: string, bags: number, commune: string) => {
-    const driverToCheckout = store.getWaitingDrivers().find(d => d.id === driverId);
-    if (driverToCheckout) {
-      const dispatchRecord: DispatchRecord = {
-        ...driverToCheckout,
-        checkoutTime: Date.now(),
-        bags,
-        commune,
-        coordinatorId: 'coord001', // Replace with actual coordinator ID if available
-      };
-      store.addDispatchRecord(dispatchRecord);
-      store.removeWaitingDriver(driverId);
-      refreshData(); // Update UI
+  // Manejar la marcación de salida de un conductor
+  const handleCheckoutDriver = async (recordId: string) => {
+    setIsLoading(true);
+    try {
+      // 1. Obtener el registro actual para tener los datos del conductor
+      const { data: recordData, error: recordError } = await supabase
+        .from('dispatch_records')
+        .select('*')
+        .eq('id', recordId)
+        .single();
+      
+      if (recordError) throw recordError;
+      
+      // 2. Actualizar el registro de despacho
+      const { error: updateError } = await supabase
+        .from('dispatch_records')
+        .update({
+          end_time: new Date().toISOString(),
+          status: 'completado'
+        })
+        .eq('id', recordId);
+      
+      if (updateError) throw updateError;
+      
+      // 3. Actualizar el estado del conductor a 'disponible'
+      if (recordData && recordData.name) {
+        const { error: driverError } = await supabase
+          .from('drivers')
+          .update({ status: 'disponible' })
+          .eq('name', recordData.name);
+        
+        if (driverError) throw driverError;
+      }
+      
+      // 4. Recargar la lista actualizada
+      await loadActiveDrivers();
+      
+    } catch (error) {
+      console.error('Error al marcar salida:', error);
+      alert('Error al marcar la salida del conductor. Intente nuevamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Loading Dashboard...</p>
+      <div className="flex flex-col items-center justify-center min-h-[300px]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-2" />
+        <p className="text-lg text-muted-foreground">Cargando conductores activos...</p>
+        <p className="text-sm text-muted-foreground">Por favor espere</p>
       </div>
     );
   }
 
   if (!isAuthenticated || role !== 'coordinator') {
-    // Auth check hook handles redirection, but this is a fallback or for explicit content hiding.
     return (
-        <div className="flex items-center justify-center min-h-[300px]">
-            <p className="text-lg text-destructive">Access Denied. Redirecting...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[300px]">
+        <p className="text-lg text-destructive">Acceso denegado. Redirigiendo...</p>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Driver Queue</h2>
+        <h2 className="text-2xl font-semibold">Cola de Conductores</h2>
         <Button onClick={handleLogout} variant="outline">
-          <LogOut className="mr-2 h-4 w-4" /> Logout
+          <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
         </Button>
       </div>
 
       {fraudAlerts.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-destructive">Fraud Alerts</h3>
+          <h3 className="text-xl font-semibold text-destructive">Alertas de Fraude</h3>
           {fraudAlerts.map(alert => (
             <Alert key={alert.id} variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Potential Fraud Detected</AlertTitle>
+              <AlertTitle>Posible fraude detectado</AlertTitle>
               <AlertDescription>{alert.message}</AlertDescription>
             </Alert>
           ))}
-           <Button onClick={() => { store.clearFraudAlerts(); refreshData(); }} variant="outline" size="sm">Clear Alerts</Button>
+          <Button onClick={() => { store.clearFraudAlerts(); setFraudAlerts([]); }} variant="outline" size="sm">Limpiar alertas</Button>
         </div>
       )}
 
       <DriverQueue 
-        drivers={waitingDrivers} 
+        drivers={activeDrivers} 
         onCheckoutDriver={handleCheckoutDriver} 
       />
     </div>
