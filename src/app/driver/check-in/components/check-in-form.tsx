@@ -357,12 +357,13 @@ export function CheckInForm(): React.JSX.Element {
       const { error: dispatchError } = await supabase
         .from('dispatch_records')
         .insert({
-          driver_name: name,
+          id: uuidv4(),
           driver_id: persistentId,
-          latitude: currentLocation?.latitude,
-          longitude: currentLocation?.longitude,
-          timestamp: new Date().toISOString(),
-          selfie_url: selfieStorageUrl, // Usar la URL de Storage en lugar del dataUrl
+          start_time: new Date().toISOString(),
+          startlatitude: currentLocation?.latitude,
+          startlongitude: currentLocation?.longitude,
+          status: 'en_curso',
+          selfie_url: selfieStorageUrl
         });
 
       if (dispatchError) throw dispatchError;
@@ -372,7 +373,7 @@ export function CheckInForm(): React.JSX.Element {
         id: persistentId,
         name,
         checkInTime: Date.now(),
-        selfieDataUrl: selfieStorageUrl,
+        selfieDataUrl: selfieStorageUrl, // Keep for UI purposes
         location: currentLocation || undefined
       };
       
