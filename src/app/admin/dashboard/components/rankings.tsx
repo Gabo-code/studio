@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { store } from '@/lib/store';
+import { store, subscribe } from '@/lib/store';
 import type { DispatchRecord, Driver } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChart, Trophy } from 'lucide-react';
@@ -56,7 +56,7 @@ export function Rankings() {
 
   useEffect(() => {
     calculateRankings();
-    const unsubscribe = store.subscribe(calculateRankings);
+    const unsubscribe = subscribe(calculateRankings);
     return () => unsubscribe();
   }, [calculateRankings]);
 
