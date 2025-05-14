@@ -182,7 +182,12 @@ export function CoordinatorDashboardClient() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">Cola de Conductores</h2>
+        <h2 className="text-2xl font-semibold">
+          Cola de Conductores
+          <span className="text-lg ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+            {activeDrivers.length} {activeDrivers.length === 1 ? 'conductor' : 'conductores'}
+          </span>
+        </h2>
         <Button onClick={handleLogout} variant="outline">
           <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
         </Button>

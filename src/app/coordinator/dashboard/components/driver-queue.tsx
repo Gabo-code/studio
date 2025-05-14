@@ -46,9 +46,12 @@ export function DriverQueue({ drivers, onCheckoutDriver }: DriverQueueProps) {
 
   return (
     <div className="space-y-4">
-      {drivers.map((driver) => (
+      {drivers.map((driver, index) => (
         <Card key={driver.id} className="shadow-md hover:shadow-lg transition-shadow duration-200">
           <CardHeader className="flex flex-row items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+              {index + 1}
+            </div>
             <Avatar className="h-16 w-16">
               {driver.selfie_url ? (
                 <AvatarImage src={driver.selfie_url} alt={`Selfie de ${driver.name}`} />
