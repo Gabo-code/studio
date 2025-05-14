@@ -423,7 +423,7 @@ export function CheckInForm(): React.JSX.Element {
       const result = store.addWaitingDriver(waitingDriverData);
       
       if (result.success) {
-        router.push('/driver/waiting');
+        router.push('/');
       } else {
         setFormError(result.alert?.message || 'Error al registrar el conductor');
       }
