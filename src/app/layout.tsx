@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import Head from 'next/head';
 import { ClientSetupProvider } from '@/components/client-setup-provider';
+import { ErrorLogViewer } from '@/components/error-log-viewer';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -40,6 +41,7 @@ export default function RootLayout({
           {children}
         </ClientSetupProvider>
         <Toaster />
+        <ErrorLogViewer />
       </body>
     </html>
   );
