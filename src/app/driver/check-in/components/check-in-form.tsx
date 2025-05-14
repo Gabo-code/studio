@@ -333,7 +333,8 @@ export function CheckInForm(): React.JSX.Element {
       toast({
         title: "Error",
         description: "Persistent ID not available. Please refresh.",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 5000
       });
       return;
     }
@@ -342,7 +343,32 @@ export function CheckInForm(): React.JSX.Element {
     setFormError(null);
     
     try {
-      // Actualizar estado del conductor a "ocupado"
+      // Verificar si el conductor ya está en estado "ocupado"
+      const { data: driverStatus, error: driverStatusError } = await supabase
+        .from('drivers')
+        .select('status')
+        .eq('name', name)
+        .maybeSingle();
+        
+      console.log('📱 VERIFICANDO ESTADO:', driverStatus);
+      
+      if (driverStatusError) {
+        throw new Error('Error al verificar el estado del conductor');
+      }
+      
+      if (driverStatus && driverStatus.status === 'ocupado') {
+        setFormError('Ya estás registrado y en estado OCUPADO. Espera a que el coordinador marque tu salida.');
+        toast({
+          title: "Ya estás registrado",
+          description: "Tu asistencia ya está registrada y estás en estado OCUPADO. Espera a que el coordinador marque tu salida.",
+          variant: "default",
+          duration: 6000
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Continuar con el resto del proceso de check-in
       console.log('📱 PASO 1: Buscando conductor con nombre:', name);
       
       // First, get the driver's actual ID from the database
@@ -424,6 +450,8 @@ export function CheckInForm(): React.JSX.Element {
       // Añadir el conductor a la lista de espera
       const result = store.addWaitingDriver(waitingDriverData);
       
+      // Cuando mostramos toast en el caso de éxito o duplicado, aumentar la duración
+      // y hacer más visible el toast
       // Siempre redirigir a la página principal después de que el registro en la base de datos fue exitoso
       // Incluso si el conductor ya está en la lista de espera, el registro en la tabla dispatch_records se realizó correctamente
       router.push('/');
@@ -431,12 +459,21 @@ export function CheckInForm(): React.JSX.Element {
       // Si el conductor ya está en la lista de espera, mostrar un mensaje informativo en vez de un error
       if (!result.success && result.alert?.type === "duplicateId") {
         toast({
-          title: "Registro Exitoso",
+          title: "Registro Exitoso", 
           description: "Tu asistencia ya estaba registrada. Espera a que el coordinador te asigne un viaje.",
-          variant: "default" // Usar variante default (no destructive) para indicar que no es un error
+          variant: "default",
+          duration: 6000
         });
       } else if (!result.success) {
         setFormError(result.alert?.message || 'Error al registrar el conductor');
+      } else {
+        // Mostrar mensaje de éxito si todo salió bien
+        toast({
+          title: "¡Registro Exitoso!",
+          description: "Tu asistencia ha sido registrada correctamente.",
+          variant: "default",
+          duration: 6000
+        });
       }
       
     } catch (error) {
