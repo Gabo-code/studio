@@ -12,10 +12,7 @@ interface AppState {
 
 // Initial state with some mock data
 const state: AppState = {
-  masterDriverList: [
-    { id: 'pid_master_1', name: 'Juan Perez' },
-    { id: 'pid_master_2', name: 'Ana Gomez' },
-  ],
+  masterDriverList: [],
   waitingDrivers: [],
   dispatchHistory: [],
   fraudAlerts: [],
