@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, User } from 'lucide-react';
-import { WaitingList } from './waiting-list';
+import { WaitingList } from '.';
 
 // Interface para los conductores en espera (simplificada)
 interface WaitingDriver {
