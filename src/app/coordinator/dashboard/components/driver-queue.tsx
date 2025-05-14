@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { User, Clock, Check } from 'lucide-react';
+import { User, Clock, Check, Truck } from 'lucide-react';
 
 // Nueva interfaz para los conductores activos
 interface DriverRecord {
@@ -15,6 +15,7 @@ interface DriverRecord {
   status: string;
   selfie_url?: string;
   pid?: string;
+  vehicle_type?: string;
 }
 
 interface DriverQueueProps {
@@ -57,6 +58,14 @@ export function DriverQueue({ drivers, onCheckoutDriver }: DriverQueueProps) {
             </Avatar>
             <div className="flex-grow">
               <CardTitle className="text-xl">{driver.name}</CardTitle>
+              {driver.vehicle_type && (
+                <div className="text-sm mt-1 flex items-center">
+                  <Truck className="h-3 w-3 mr-1 text-blue-500" />
+                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                    {driver.vehicle_type}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-col mt-2 text-sm">
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" /> 

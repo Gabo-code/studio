@@ -21,6 +21,7 @@ interface DriverRecord {
   status: string;
   selfie_url?: string;
   pid?: string;
+  vehicle_type?: string;
 }
 
 export function CoordinatorDashboardClient() {
@@ -35,7 +36,8 @@ export function CoordinatorDashboardClient() {
   const loadActiveDrivers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Primero obtenemos los registros activos
+      const { data: dispatchRecords, error: dispatchError } = await supabase
         .from('dispatch_records')
         .select(`
           id,
@@ -49,13 +51,44 @@ export function CoordinatorDashboardClient() {
         .eq('status', 'en_curso')
         .order('start_time', { ascending: true });
       
-      if (error) {
-        console.error('Error cargando conductores activos:', error);
-      } else {
-        setActiveDrivers(data || []);
+      if (dispatchError) {
+        console.error('Error cargando registros activos:', dispatchError);
+        setActiveDrivers([]);
+        setIsLoading(false);
+        return;
       }
+      
+      // Si no hay registros, terminamos
+      if (!dispatchRecords || dispatchRecords.length === 0) {
+        setActiveDrivers([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Para cada registro, obtenemos el tipo de vehículo del conductor
+      const recordsWithVehicleType = await Promise.all(
+        dispatchRecords.map(async (record) => {
+          // Buscamos el conductor por nombre
+          const { data: driverData, error: driverError } = await supabase
+            .from('drivers')
+            .select('vehicle_type')
+            .eq('name', record.name)
+            .maybeSingle();
+          
+          // Si no hay error y encontramos el tipo de vehículo, lo añadimos al registro
+          if (!driverError && driverData && driverData.vehicle_type) {
+            return { ...record, vehicle_type: driverData.vehicle_type };
+          }
+          
+          // Si hay error o no encontramos el tipo de vehículo, devolvemos el registro original
+          return record;
+        })
+      );
+      
+      setActiveDrivers(recordsWithVehicleType);
     } catch (err) {
       console.error('Error al cargar datos:', err);
+      setActiveDrivers([]);
     } finally {
       setIsLoading(false);
     }
