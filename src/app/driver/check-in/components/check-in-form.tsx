@@ -28,7 +28,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { v4 as uuidv4 } from 'uuid';
-import { errorLogger } from '@/components/error-log-viewer';
 
 // Dynamically import LocationMap as it uses Leaflet which is client-side only
 const LocationMap = dynamic(() => import('./location-map').then(mod => mod.LocationMap), {
@@ -179,56 +178,27 @@ export function CheckInForm(): React.JSX.Element {
       setSelfieDataUrl(dataUrl); // Guardamos la vista previa
       
       console.log('Iniciando subida de selfie...');
-      errorLogger.addLog({
-        message: 'Iniciando subida de selfie',
-        context: 'CheckInForm'
-      });
       
       // Crear ruta de archivo usando la utilidad
       const filePath = generateSelfieFilePath(persistentId);
       const bucket = getSelfieBucket();
       console.log('Ruta destino:', bucket, filePath);
-      errorLogger.addLog({
-        message: `Destino de subida configurado`,
-        context: 'Storage',
-        details: { bucket, filePath }
-      });
       
       // Método alternativo: convertir dataURL directamente a File
       const fileName = filePath.split('/').pop() || 'selfie.jpg';
       const file = dataURLtoFile(dataUrl, fileName);
       console.log('Archivo creado:', file.name, file.size, 'bytes', file.type);
-      errorLogger.addLog({
-        message: `Archivo preparado para subida`,
-        context: 'Storage',
-        details: { name: file.name, size: `${file.size} bytes`, type: file.type }
-      });
       
       // Verificar acceso al bucket
       try {
         const { data: listData, error: listError } = await supabase.storage.from(bucket).list();
         if (listError) {
           console.error('Error al listar bucket:', listError);
-          errorLogger.addLog({
-            message: `Error verificando bucket "${bucket}"`,
-            context: 'Storage',
-            details: listError
-          });
         } else {
           console.log('Bucket accesible, contiene', listData.length, 'archivos');
-          errorLogger.addLog({
-            message: `Bucket "${bucket}" accesible`,
-            context: 'Storage',
-            details: `Contiene ${listData.length} archivos`
-          });
         }
       } catch (listCheckError) {
         console.error('Error verificando acceso al bucket:', listCheckError);
-        errorLogger.addLog({
-          message: `Excepción verificando bucket`,
-          context: 'Storage',
-          details: listCheckError instanceof Error ? listCheckError.message : String(listCheckError)
-        });
       }
       
       // INTENTAR AMBOS MÉTODOS DE SUBIDA
@@ -239,10 +209,6 @@ export function CheckInForm(): React.JSX.Element {
       // MÉTODO 1: Cliente Supabase
       try {
         console.log('MÉTODO 1: Intentando subir con cliente Supabase...');
-        errorLogger.addLog({
-          message: `Iniciando método 1: Cliente Supabase`,
-          context: 'Storage'
-        });
         
         const { data, error } = await supabase
           .storage
@@ -254,35 +220,16 @@ export function CheckInForm(): React.JSX.Element {
         
         if (error) {
           console.error('Error con cliente Supabase:', error);
-          errorLogger.addLog({
-            message: `Error en método 1`,
-            context: 'Storage',
-            details: error
-          });
           uploadError = error;
         } else {
           console.log('Subida exitosa con cliente Supabase:', data);
-          errorLogger.addLog({
-            message: `Subida exitosa con método 1`,
-            context: 'Storage'
-          });
           
           const urlData = supabase.storage.from(bucket).getPublicUrl(filePath).data;
           publicUrl = urlData.publicUrl;
           console.log('URL obtenida con cliente Supabase:', publicUrl);
-          errorLogger.addLog({
-            message: `URL pública generada`,
-            context: 'Storage',
-            details: publicUrl
-          });
         }
       } catch (e) {
         console.error('Excepción con cliente Supabase:', e);
-        errorLogger.addLog({
-          message: `Excepción en método 1`,
-          context: 'Storage',
-          details: e instanceof Error ? e.message : String(e)
-        });
         uploadError = e;
       }
       
@@ -290,25 +237,11 @@ export function CheckInForm(): React.JSX.Element {
       if (!publicUrl) {
         try {
           console.log('MÉTODO 2: Intentando subir con fetch directo...');
-          errorLogger.addLog({
-            message: `Iniciando método 2: Fetch directo`,
-            context: 'Storage'
-          });
           
           publicUrl = await uploadWithFetch(file, bucket, filePath);
           console.log('Subida exitosa con fetch directo');
-          errorLogger.addLog({
-            message: `Subida exitosa con método 2`,
-            context: 'Storage',
-            details: publicUrl
-          });
         } catch (fetchError) {
           console.error('Error con fetch directo:', fetchError);
-          errorLogger.addLog({
-            message: `Error en método 2`,
-            context: 'Storage',
-            details: fetchError instanceof Error ? fetchError.message : String(fetchError)
-          });
           // Si ambos métodos fallaron, usar el error original
           if (!uploadError) {
             uploadError = fetchError;
@@ -323,24 +256,12 @@ export function CheckInForm(): React.JSX.Element {
           title: "Selfie guardada",
           description: "Tu selfie se ha guardado correctamente",
         });
-        errorLogger.addLog({
-          message: `Selfie guardada correctamente`,
-          context: 'CheckInForm',
-          details: publicUrl
-        });
       } else {
         // Si ningún método funcionó, mostrar el error
         throw uploadError || new Error('No se pudo subir la imagen por medios alternativos');
       }
     } catch (error) {
       console.error('Error al subir selfie:', error);
-      errorLogger.addLog({
-        message: `Error crítico en la subida de selfie`,
-        context: 'CheckInForm',
-        details: error instanceof Error 
-          ? { name: error.constructor.name, message: error.message, stack: error.stack } 
-          : error
-      });
       
       // Mostrar información detallada del error
       if (error instanceof Error) {
