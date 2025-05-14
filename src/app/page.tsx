@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppLogo } from '@/components/icons/logo';
-import { Users, UserCog, Truck } from 'lucide-react';
+import { Users, UserCog, Truck, Clock } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -28,6 +28,21 @@ export default function HomePage() {
             <Link href="/driver/check-in" legacyBehavior passHref>
               <Button className="w-full" variant="default">
                 Go to Driver Check-in
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <CardHeader>
+            <Clock className="h-10 w-10 text-primary mb-2" />
+            <CardTitle className="text-2xl">Waiting Portal</CardTitle>
+            <CardDescription>View your position in the waiting queue.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/waiting" legacyBehavior passHref>
+              <Button className="w-full" variant="default">
+                View Waiting List
               </Button>
             </Link>
           </CardContent>
