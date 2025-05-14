@@ -106,7 +106,7 @@ export default function DriverCheckOut() {
       await supabase
         .from('drivers')
         .update({ status: 'disponible' })
-        .eq('id', selectedRecord.driver_id);
+        .eq('name', selectedRecord.driver.name);
 
       setMessage(`¡Viaje finalizado para ${selectedRecord.driver.name}!`);
       
