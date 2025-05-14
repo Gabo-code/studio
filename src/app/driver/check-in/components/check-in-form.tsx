@@ -452,9 +452,6 @@ export function CheckInForm(): React.JSX.Element {
       
       // Cuando mostramos toast en el caso de éxito o duplicado, aumentar la duración
       // y hacer más visible el toast
-      // Siempre redirigir a la página principal después de que el registro en la base de datos fue exitoso
-      // Incluso si el conductor ya está en la lista de espera, el registro en la tabla dispatch_records se realizó correctamente
-      router.push('/');
       
       // Si el conductor ya está en la lista de espera, mostrar un mensaje informativo en vez de un error
       if (!result.success && result.alert?.type === "duplicateId") {
@@ -464,16 +461,25 @@ export function CheckInForm(): React.JSX.Element {
           variant: "default",
           duration: 6000
         });
+        // Redirigir después de un breve retraso
+        setTimeout(() => {
+          router.push('/');
+        }, 2000);
       } else if (!result.success) {
         setFormError(result.alert?.message || 'Error al registrar el conductor');
       } else {
-        // Mostrar mensaje de éxito si todo salió bien
+        // Mostrar mensaje de éxito inmediatamente si todo salió bien
         toast({
           title: "¡Registro Exitoso!",
           description: "Tu asistencia ha sido registrada correctamente.",
           variant: "default",
           duration: 6000
         });
+        
+        // Redirigir después de un breve retraso
+        setTimeout(() => {
+          router.push('/');
+        }, 2000);
       }
       
     } catch (error) {
