@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, type FormEvent, useCallback } from 'react';
-import { store } from '@/lib/store';
+import { store, subscribe } from '@/lib/store';
 import type { Driver } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ export function DriverManagement() {
 
   useEffect(() => {
     refreshDrivers();
-    const unsubscribe = store.subscribe(refreshDrivers);
+    const unsubscribe = subscribe(refreshDrivers);
     return () => unsubscribe();
   }, [refreshDrivers]);
 
