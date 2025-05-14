@@ -343,6 +343,27 @@ export function CheckInForm(): React.JSX.Element {
     
     try {
       // Actualizar estado del conductor a "ocupado"
+      console.log('📱 PASO 1: Buscando conductor con nombre:', name);
+      
+      // First, get the driver's actual ID from the database
+      const { data: driverData, error: getDriverError } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('name', name)
+        .maybeSingle();
+        
+      console.log('📱 PASO 2: Resultado búsqueda conductor:', 
+                  { conductor: driverData, error: getDriverError });
+      
+      if (getDriverError) throw getDriverError;
+      
+      if (!driverData) {
+        throw new Error(`No se encontró el conductor con nombre ${name} en la base de datos`);
+      }
+      
+      const driverId = driverData.id;
+      console.log('📱 PASO 3: ID encontrado:', driverId);
+      
       const { error: driverError } = await supabase
         .from('drivers')
         .update({
@@ -351,22 +372,43 @@ export function CheckInForm(): React.JSX.Element {
         })
         .eq('name', name);
 
+      console.log('📱 PASO 4: Actualización de status a ocupado:', 
+                  { resultado: driverError ? 'ERROR' : 'ÉXITO', error: driverError });
+
       if (driverError) throw driverError;
       
-      // Crear nuevo registro de despacho
-      const { error: dispatchError } = await supabase
+      // Use the actual driver ID from the database for the dispatch record
+      const dispatchRecord = {
+        id: uuidv4(),
+        driver_id: driverId, // Use the actual driver ID from the database
+        start_time: new Date().toISOString(),
+        startlatitude: currentLocation?.latitude,
+        startlongitude: currentLocation?.longitude,
+        status: 'en_curso',
+        selfie_url: selfieStorageUrl
+      };
+      
+      console.log('📱 PASO 5: Creando registro de despacho:', dispatchRecord);
+      
+      const { data: insertData, error: dispatchError } = await supabase
         .from('dispatch_records')
-        .insert({
-          id: uuidv4(),
-          driver_id: persistentId,
-          start_time: new Date().toISOString(),
-          startlatitude: currentLocation?.latitude,
-          startlongitude: currentLocation?.longitude,
-          status: 'en_curso',
-          selfie_url: selfieStorageUrl
-        });
+        .insert(dispatchRecord)
+        .select();
+        
+      console.log('📱 PASO 6: Resultado creación:', 
+                  { resultado: dispatchError ? 'ERROR' : 'ÉXITO', 
+                    datos: insertData, 
+                    error: dispatchError });
 
-      if (dispatchError) throw dispatchError;
+      if (dispatchError) {
+        // Add a special error message if it seems to be a foreign key issue
+        if (dispatchError.message && 
+            (dispatchError.message.includes('foreign key') || 
+             dispatchError.message.includes('violates foreign key constraint'))) {
+          throw new Error(`Error de conexión entre tablas. El ID del conductor no coincide entre tablas.`);
+        }
+        throw dispatchError;
+      }
 
       // Guardar en store local para uso en la aplicación
       const waitingDriverData: WaitingDriver = {
@@ -388,7 +430,45 @@ export function CheckInForm(): React.JSX.Element {
       
     } catch (error) {
       console.error('Error during check-in:', error);
-      setFormError('Error durante el check-in. Por favor intenta nuevamente.');
+      
+      // Show more detailed error information in the console
+      let errorMessage = 'Error durante el check-in. Por favor intenta nuevamente.';
+      
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        // Create a shorter, more readable message for the phone
+        const shortMessage = error.message.length > 100 
+          ? error.message.substring(0, 100) + '...' 
+          : error.message;
+        
+        errorMessage = `Error: ${shortMessage}`;
+        
+        // Show toast instead of alert
+        toast({
+          title: "Error de check-in",
+          description: shortMessage,
+          variant: "destructive"
+        });
+      } else if (typeof error === 'object' && error !== null) {
+        // For Supabase errors that aren't standard Error instances
+        const errorObj = error as any;
+        console.error('Error object:', JSON.stringify(errorObj, null, 2));
+        
+        // Extract a useful message for mobile display
+        const supabaseMessage = errorObj.message || errorObj.error || 
+                               (errorObj.details ? errorObj.details.substring(0, 100) : 'Error desconocido');
+        
+        errorMessage = `Error: ${supabaseMessage}`;
+        
+        // Show toast instead of alert
+        toast({
+          title: "Error de base de datos",
+          description: supabaseMessage,
+          variant: "destructive"
+        });
+      }
+      
+      setFormError(errorMessage);
     } finally {
       setIsLoading(false);
     }
