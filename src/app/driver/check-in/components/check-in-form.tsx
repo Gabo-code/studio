@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePersistentId } from '@/hooks/use-persistent-id';
 import { store } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
+import { generateSelfieFilePath, getSelfieBucket } from '@/lib/storage';
 import type { WaitingDriver } from '@/types';
 import { Loader2, Camera, MapPin, AlertTriangle, Check, Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -26,6 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { v4 as uuidv4 } from 'uuid';
 
 // Dynamically import LocationMap as it uses Leaflet which is client-side only
 const LocationMap = dynamic(() => import('./location-map').then(mod => mod.LocationMap), {
@@ -36,6 +38,7 @@ const LocationMap = dynamic(() => import('./location-map').then(mod => mod.Locat
 export function CheckInForm(): React.JSX.Element {
   const [name, setName] = useState('');
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
+  const [selfieStorageUrl, setSelfieStorageUrl] = useState<string | null>(null);
   const [isLocationVerified, setIsLocationVerified] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +49,7 @@ export function CheckInForm(): React.JSX.Element {
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
   const [open, setOpen] = useState(false);
   const [vehicleType, setVehicleType] = useState<string | null>(null);
+  const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
   
   const persistentId = usePersistentId();
   const { toast } = useToast();
@@ -109,9 +113,61 @@ export function CheckInForm(): React.JSX.Element {
     checkExistingDriver();
   }, [persistentId, drivers]);
 
-  const handleSelfieCaptured = (dataUrl: string | null) => {
-    setSelfieDataUrl(dataUrl);
-    setShowSelfieCapture(false); // Hide the selfie capture UI after capture or cancel
+  const handleSelfieCaptured = async (dataUrl: string | null) => {
+    if (!dataUrl) {
+      setSelfieDataUrl(null);
+      setSelfieStorageUrl(null);
+      setShowSelfieCapture(false);
+      return;
+    }
+    
+    try {
+      setIsUploadingSelfie(true);
+      setSelfieDataUrl(dataUrl); // Guardamos la vista previa
+
+      // Convertir dataURL a blob
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      
+      // Crear ruta de archivo usando la utilidad
+      const filePath = generateSelfieFilePath(persistentId);
+      const bucket = getSelfieBucket();
+
+      // Subir a Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from(bucket)
+        .upload(filePath, blob, {
+          contentType: 'image/jpeg',
+          upsert: false
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Obtener URL pública
+      const { data: { publicUrl } } = supabase
+        .storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      setSelfieStorageUrl(publicUrl);
+      toast({
+        title: "Selfie guardada",
+        description: "Tu selfie se ha guardado correctamente",
+      });
+    } catch (error) {
+      console.error('Error al subir selfie:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la selfie. Intenta de nuevo.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploadingSelfie(false);
+      setShowSelfieCapture(false);
+    }
   };
 
   const handleDriverSelect = (driverName: string) => {
@@ -127,266 +183,228 @@ export function CheckInForm(): React.JSX.Element {
 
   const handleCheckIn = async (e: FormEvent) => {
     e.preventDefault();
+
+    if (!name) {
+      setFormError('Se requiere un nombre');
+      return;
+    }
+
+    if (!isLocationVerified) {
+      setFormError('Por favor verifica tu ubicación');
+      return;
+    }
+
+    if (!selfieStorageUrl) {
+      setFormError('Por favor toma una selfie');
+      return;
+    }
+
     if (!persistentId) {
-      toast({ title: "Error", description: "Persistent ID not available. Please refresh.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Persistent ID not available. Please refresh.",
+        variant: "destructive"
+      });
       return;
     }
-    if (!name.trim()) {
-      setFormError("Please enter your name.");
-      return;
-    }
-    if (!isLocationVerified || !currentLocation) {
-      setFormError("Location not verified or not within range. Please enable location services and ensure you are near Jumbo.");
-      return;
-    }
-    if (!selfieDataUrl) {
-      setFormError("Please take a selfie.");
-      return;
-    }
-    setFormError(null);
+
     setIsLoading(true);
-
+    setFormError(null);
+    
     try {
-      // Verificar que el conductor existe en la lista
-      const driverExists = drivers.some(d => d.name === name);
-      if (!driverExists) {
-        setFormError("El nombre del conductor no está en la lista autorizada.");
-        setIsLoading(false);
-        return;
-      }
-
-      // Verificar si este dispositivo ya está asociado a otro conductor
-      const { data: existingDriver } = await supabase
+      // Actualizar estado del conductor a "ocupado"
+      const { error: driverError } = await supabase
         .from('drivers')
-        .select('name')
-        .eq('pid', persistentId)
-        .not('name', 'eq', name) // Diferente al nombre actual
-        .maybeSingle();
+        .update({
+          pid: persistentId,
+          status: 'ocupado',
+        })
+        .eq('name', name);
 
-      if (existingDriver) {
-        toast({
-          title: "Error de Acceso",
-          description: `Este dispositivo ya está asociado al conductor: ${existingDriver.name}`,
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Verificar si el conductor ya está asociado a otro dispositivo
-      const { data: existingPid } = await supabase
-        .from('drivers')
-        .select('pid')
-        .eq('name', name)
-        .not('pid', 'is', null)
-        .maybeSingle();
-
-      if (existingPid && existingPid.pid !== persistentId) {
-        toast({
-          title: "Error de Acceso",
-          description: `Este conductor ya está asociado a otro dispositivo.`,
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Obtener el ID interno del conductor seleccionado
-      const { data: driverRecord, error: driverError } = await supabase
-        .from('drivers')
-        .select('id')
-        .eq('name', name)
-        .single();
-
-      if (driverError || !driverRecord) {
-        throw new Error(`No se pudo obtener el ID del conductor: ${driverError?.message || "Datos no encontrados"}`);
-      }
-
-      // Crear un registro en dispatch_records
-      const dispatchRecord = {
-        driver_id: driverRecord.id, // Usar el ID interno del conductor
-        start_time: new Date().toISOString(),
-        startlatitude: currentLocation.latitude,
-        startlongitude: currentLocation.longitude,
-        status: 'en_curso'
-      };
-
+      if (driverError) throw driverError;
+      
+      // Crear nuevo registro de despacho
       const { error: dispatchError } = await supabase
         .from('dispatch_records')
-        .insert([dispatchRecord]);
+        .insert({
+          driver_name: name,
+          driver_id: persistentId,
+          latitude: currentLocation?.latitude,
+          longitude: currentLocation?.longitude,
+          timestamp: new Date().toISOString(),
+          selfie_url: selfieStorageUrl, // Usar la URL de Storage en lugar del dataUrl
+        });
 
-      if (dispatchError) {
-        throw new Error(`Error al crear registro de despacho: ${dispatchError.message}`);
-      }
+      if (dispatchError) throw dispatchError;
 
-      // Actualizar el PID en la tabla drivers para este conductor
-      const { error: updateError } = await supabase
-        .from('drivers')
-        .update({ 
-          pid: persistentId,
-          status: 'ocupado' // Actualizar el estado del conductor a ocupado
-        })
-        .eq('id', driverRecord.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Crear el registro de espera para el store local
+      // Guardar en store local para uso en la aplicación
       const waitingDriverData: WaitingDriver = {
         id: persistentId,
-        name: name.trim(),
+        name,
         checkInTime: Date.now(),
-        selfieDataUrl: selfieDataUrl,
-        location: currentLocation,
+        selfieDataUrl: selfieStorageUrl,
+        location: currentLocation || undefined
       };
-
+      
+      // Añadir el conductor a la lista de espera
       const result = store.addWaitingDriver(waitingDriverData);
-
+      
       if (result.success) {
-        toast({
-          title: "Check-in Exitoso!",
-          description: `Bienvenido, ${name}! Estás en la cola.`,
-        });
-        
-        if(result.alert) { // Fraud alert but still successful check-in
-          toast({
-            title: "Aviso",
-            description: result.alert.message,
-            variant: "default",
-            duration: 10000,
-          });
-        }
-        
-        // Opcional: redirigir o limpiar formulario
-        setName('');
-        setSelfieDataUrl(null);
-        setShowSelfieCapture(false);
-        setIsNameLocked(false);
+        router.push('/driver/waiting');
       } else {
-        toast({
-          title: "Check-in Fallido",
-          description: result.alert?.message || "No se pudo agregar a la cola. Es posible que ya estés registrado.",
-          variant: "destructive",
-        });
+        setFormError(result.alert?.message || 'Error al registrar el conductor');
       }
+      
     } catch (error) {
-      console.error('Error en el check-in:', error);
-      setFormError("Ocurrió un error al procesar el check-in. Intenta de nuevo.");
+      console.error('Error during check-in:', error);
+      setFormError('Error durante el check-in. Por favor intenta nuevamente.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleCheckIn} className="space-y-6">
-      {formError && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{formError}</AlertDescription>
-        </Alert>
-      )}
-      
-      <div className="space-y-2">
-        <Label htmlFor="name" className="text-lg font-medium">Tu Nombre</Label>
-        {isNameLocked ? (
-          <div className="relative">
-            <Input
-              id="name"
-              type="text"
-              value={name}
-              readOnly
-              className="text-base py-3 px-4 bg-gray-100"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Check className="h-5 w-5 text-green-500" />
+    <div className="w-full max-w-md mx-auto">
+      <form className="space-y-6" onSubmit={handleCheckIn}>
+        {formError && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{formError}</AlertDescription>
+          </Alert>
+        )}
+        
+        <div className="space-y-2">
+          <Label htmlFor="name" className="text-lg font-medium">Tu Nombre</Label>
+          {isNameLocked ? (
+            <div className="relative">
+              <Input
+                id="name"
+                type="text"
+                value={name}
+                readOnly
+                className="text-base py-3 px-4 bg-gray-100"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Check className="h-5 w-5 text-green-500" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {vehicleType && <span>Vehículo: {vehicleType} | </span>}
+                Tu nombre está asociado a este dispositivo y no puede ser cambiado.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {vehicleType && <span>Vehículo: {vehicleType} | </span>}
-              Tu nombre está asociado a este dispositivo y no puede ser cambiado.
-            </p>
+          ) : isLoadingDrivers ? (
+            <div className="flex items-center space-x-2">
+              <Input
+                id="name"
+                type="text"
+                value="Cargando conductores..."
+                disabled
+                className="text-base py-3 px-4"
+              />
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  className="w-full justify-between"
+                >
+                  {name ? name : "Selecciona un conductor..."}
+                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar conductor..." className="h-9" />
+                  <CommandEmpty>No se encontraron conductores.</CommandEmpty>
+                  <CommandGroup>
+                    {drivers.map((driver) => (
+                      <CommandItem
+                        key={driver.id}
+                        value={driver.name}
+                        onSelect={() => handleDriverSelect(driver.name)}
+                      >
+                        <span>{driver.name}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {driver.vehicle_type}
+                        </span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-lg font-medium flex items-center"><MapPin className="mr-2 h-5 w-5 text-primary" />Verificación de Ubicación</Label>
+          <LocationMap onLocationVerified={setIsLocationVerified} onLocationUpdate={setCurrentLocation} />
+          {!isLocationVerified && <p className="text-sm text-muted-foreground">Asegúrate de estar dentro de 50 metros de la tienda Jumbo. El mapa indicará el estado.</p>}
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="selfie" className="text-lg font-medium flex items-center">
+              <Camera className="mr-2 h-5 w-5 text-primary" />Selfie
+            </Label>
+            <div className="text-sm text-muted-foreground">
+              {selfieDataUrl ? 'Selfie Capturada' : 'Requerida'}
+            </div>
           </div>
-        ) : isLoadingDrivers ? (
-          <div className="flex items-center space-x-2">
-            <Input
-              id="name"
-              type="text"
-              value="Cargando conductores..."
-              disabled
-              className="text-base py-3 px-4"
+          
+          {showSelfieCapture ? (
+            <SelfieCapture 
+              onSelfieCaptured={handleSelfieCaptured} 
+              onCancel={() => setShowSelfieCapture(false)}
+              isUploading={isUploadingSelfie} 
             />
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : (
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
+          ) : selfieDataUrl ? (
+            <div className="relative h-48 w-48 mx-auto">
+              <img
+                src={selfieDataUrl}
+                alt="Vista previa de selfie"
+                className="h-full w-full object-cover rounded-md"
+              />
               <Button
+                type="button"
+                size="sm"
                 variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className="w-full justify-between"
+                className="absolute -top-2 -right-2 h-7 w-7 rounded-full p-0"
+                onClick={() => {
+                  setSelfieDataUrl(null);
+                  setSelfieStorageUrl(null);
+                }}
               >
-                {name ? name : "Selecciona un conductor..."}
-                <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                &times;
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[300px] p-0">
-              <Command>
-                <CommandInput placeholder="Buscar conductor..." className="h-9" />
-                <CommandEmpty>No se encontraron conductores.</CommandEmpty>
-                <CommandGroup>
-                  {drivers.map((driver) => (
-                    <CommandItem
-                      key={driver.id}
-                      value={driver.name}
-                      onSelect={() => handleDriverSelect(driver.name)}
-                    >
-                      <span>{driver.name}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {driver.vehicle_type}
-                      </span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-lg font-medium flex items-center"><MapPin className="mr-2 h-5 w-5 text-primary" />Verificación de Ubicación</Label>
-        <LocationMap onLocationVerified={setIsLocationVerified} onLocationUpdate={setCurrentLocation} />
-        {!isLocationVerified && <p className="text-sm text-muted-foreground">Asegúrate de estar dentro de 50 metros de la tienda Jumbo. El mapa indicará el estado.</p>}
-      </div>
-      
-      <div className="space-y-2">
-        <Label className="text-lg font-medium flex items-center"><Camera className="mr-2 h-5 w-5 text-primary" />Selfie</Label>
-        {showSelfieCapture ? (
-          <SelfieCapture onSelfieCaptured={handleSelfieCaptured} onCancel={() => setShowSelfieCapture(false)} />
-        ) : (
-          <Button type="button" variant="outline" onClick={() => setShowSelfieCapture(true)} className="w-full py-3">
-            <Camera className="mr-2 h-4 w-4" /> Tomar Selfie
-          </Button>
-        )}
-        {selfieDataUrl && !showSelfieCapture && (
-          <div className="mt-2 text-center">
-            <img src={selfieDataUrl} alt="Selfie preview" data-ai-hint="driver selfie" className="rounded-md border max-w-xs mx-auto shadow-sm" />
-            <Button type="button" variant="link" onClick={() => { setSelfieDataUrl(null); setShowSelfieCapture(true); }} className="mt-1">
-              Tomar de nuevo
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full py-3"
+              onClick={() => setShowSelfieCapture(true)}
+              disabled={isUploadingSelfie}
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              {isUploadingSelfie ? 'Subiendo selfie...' : 'Tomar Selfie'}
             </Button>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      <Button 
-        type="submit" 
-        className="w-full text-lg py-4"
-        disabled={isLoading || !isLocationVerified || !selfieDataUrl || !name.trim()}
-      >
-        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-        Registrar Asistencia
-      </Button>
-    </form>
+        <Button 
+          type="submit" 
+          className="w-full text-lg py-4"
+          disabled={isLoading || !isLocationVerified || !selfieStorageUrl || !name.trim()}
+        >
+          {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+          Registrar Asistencia
+        </Button>
+      </form>
+    </div>
   );
 }

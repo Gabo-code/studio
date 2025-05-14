@@ -3,16 +3,17 @@
 import { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWebcam } from '@/hooks/use-webcam';
-import { Camera, RefreshCcw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Camera, RefreshCcw, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface SelfieCaptureProps {
   onSelfieCaptured: (dataUrl: string | null) => void;
   onCancel?: () => void;
+  isUploading?: boolean;
 }
 
-export function SelfieCapture({ onSelfieCaptured, onCancel }: SelfieCaptureProps) {
+export function SelfieCapture({ onSelfieCaptured, onCancel, isUploading = false }: SelfieCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { isStreaming, error: webcamError, startStream, stopStream, capturePhoto } = useWebcam({ videoRef, canvasRef });
@@ -61,11 +62,11 @@ export function SelfieCapture({ onSelfieCaptured, onCancel }: SelfieCaptureProps
       <Alert variant="destructive" className="my-4">
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription>
-          {webcamError} Please check your browser permissions and try again.
+          {webcamError} Por favor verifica los permisos de tu navegador e intenta nuevamente.
         </AlertDescription>
          {onCancel && (
           <Button onClick={onCancel} variant="outline" size="sm" className="mt-2">
-            Close Camera
+            Cerrar Cámara
           </Button>
         )}
       </Alert>
@@ -77,13 +78,13 @@ export function SelfieCapture({ onSelfieCaptured, onCancel }: SelfieCaptureProps
       <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
         <video ref={videoRef} playsInline autoPlay className={`w-full h-full object-cover ${capturedImage ? 'hidden' : 'block'}`} aria-label="Webcam feed"></video>
         {capturedImage && (
-          <Image src={capturedImage} alt="Captured selfie" layout="fill" objectFit="cover" data-ai-hint="selfie preview" />
+          <Image src={capturedImage} alt="Selfie capturada" layout="fill" objectFit="cover" data-ai-hint="selfie preview" />
         )}
         {!isStreaming && !capturedImage && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
             <Camera className="h-12 w-12 mb-2" />
-            <p>Webcam is off or loading...</p>
-            <Button onClick={startStream} variant="outline" size="sm" className="mt-2">Activate Camera</Button>
+            <p>La cámara está apagada o cargando...</p>
+            <Button onClick={startStream} variant="outline" size="sm" className="mt-2">Activar Cámara</Button>
           </div>
         )}
       </div>
@@ -92,23 +93,26 @@ export function SelfieCapture({ onSelfieCaptured, onCancel }: SelfieCaptureProps
       <div className="flex flex-col sm:flex-row gap-2 justify-center">
         {!capturedImage && isStreaming && (
           <Button onClick={handleCapture} className="flex-1">
-            <Camera className="mr-2 h-4 w-4" /> Take Photo
+            <Camera className="mr-2 h-4 w-4" /> Tomar Foto
           </Button>
         )}
         {capturedImage && (
           <>
-            <Button onClick={handleRetake} variant="outline" className="flex-1">
-              <RefreshCcw className="mr-2 h-4 w-4" /> Retake
+            <Button onClick={handleRetake} variant="outline" className="flex-1" disabled={isUploading}>
+              <RefreshCcw className="mr-2 h-4 w-4" /> Volver a tomar
             </Button>
-            <Button onClick={handleConfirm} className="flex-1">
-              <CheckCircle className="mr-2 h-4 w-4" /> Confirm Selfie
+            <Button onClick={handleConfirm} className="flex-1" disabled={isUploading}>
+              {isUploading ? 
+                <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Subiendo... </> : 
+                <> <CheckCircle className="mr-2 h-4 w-4" /> Confirmar Selfie </>
+              }
             </Button>
           </>
         )}
       </div>
        {onCancel && (
-        <Button onClick={handleCancelAndStopStream} variant="ghost" size="sm" className="w-full mt-2 text-muted-foreground">
-          Cancel
+        <Button onClick={handleCancelAndStopStream} variant="ghost" size="sm" className="w-full mt-2 text-muted-foreground" disabled={isUploading}>
+          Cancelar
         </Button>
       )}
     </div>
