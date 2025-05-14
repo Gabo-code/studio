@@ -9,12 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Reports } from './reports';
 import { Rankings } from './rankings';
 import { DriverManagement } from './driver-management';
-import { store } from '@/lib/store';
+import { store, subscribe } from '@/lib/store';
 import type { FraudAlert } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
-
+import { AlertTriangle } from 'lucide-react'; // Keep one import
 
 export function AdminDashboardClient() {
   const { isLoading, isAuthenticated, role } = useAuthCheck('admin');
@@ -28,7 +27,7 @@ export function AdminDashboardClient() {
 
   useEffect(() => {
     refreshAlerts(); // Initial load
-    const unsubscribe = store.subscribe(refreshAlerts); // Subscribe to store changes
+    const unsubscribe = subscribe(refreshAlerts); // Subscribe to store changes using the exported subscribe function
     return () => unsubscribe(); // Cleanup subscription
   }, [refreshAlerts]);
 
