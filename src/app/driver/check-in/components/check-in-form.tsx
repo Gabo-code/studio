@@ -102,42 +102,16 @@ export function CheckInForm(): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [vehicleType, setVehicleType] = useState<string | null>(null);
   const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
+  const [hasAssociatedPid, setHasAssociatedPid] = useState(false);
   
   const persistentId = usePersistentId();
   const { toast } = useToast();
   const router = useRouter();
 
-  // Cargar la lista de conductores disponibles
-  useEffect(() => {
-    async function loadDrivers() {
-      try {
-        setIsLoadingDrivers(true);
-        const { data, error } = await supabase
-          .from('drivers')
-          .select('id, name, vehicle_type')
-          .order('name');
-        
-        if (error) {
-          throw error;
-        }
-        
-        if (data) {
-          setDrivers(data);
-        }
-      } catch (err) {
-        console.error('Error cargando conductores:', err);
-      } finally {
-        setIsLoadingDrivers(false);
-      }
-    }
-    
-    loadDrivers();
-  }, []);
-
   // Verificar si el dispositivo ya está asociado a un conductor
   useEffect(() => {
     async function checkExistingDriver() {
-      if (!persistentId || !drivers.length) return;
+      if (!persistentId) return;
       
       try {
         // Buscar si este dispositivo ya está asociado a un conductor
@@ -156,14 +130,51 @@ export function CheckInForm(): React.JSX.Element {
           setName(data.name);
           setVehicleType(data.vehicle_type);
           setIsNameLocked(true);
+          setHasAssociatedPid(true);
         }
+        
+        // Cargar la lista de conductores después de verificar asociación
+        loadDrivers(data ? true : false);
       } catch (err) {
         console.error('Error verificando conductor existente:', err);
+        // Cargar conductores de todos modos si hay un error
+        loadDrivers(false);
       }
     }
     
-    checkExistingDriver();
-  }, [persistentId, drivers]);
+    if (persistentId) {
+      checkExistingDriver();
+    }
+  }, [persistentId]);
+  
+  // Cargar la lista de conductores disponibles
+  async function loadDrivers(isAssociated: boolean) {
+    try {
+      setIsLoadingDrivers(true);
+      let query = supabase
+        .from('drivers')
+        .select('id, name, vehicle_type')
+        
+      // Si el usuario no está asociado, cargar solo conductores sin pid
+      if (!isAssociated) {
+        query = query.is('pid', null);
+      }
+      
+      const { data, error } = await query.order('name');
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setDrivers(data);
+      }
+    } catch (err) {
+      console.error('Error cargando conductores:', err);
+    } finally {
+      setIsLoadingDrivers(false);
+    }
+  }
 
   const handleSelfieCaptured = async (dataUrl: string | null) => {
     if (!dataUrl) {
@@ -554,6 +565,10 @@ export function CheckInForm(): React.JSX.Element {
               />
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
+          ) : drivers.length === 0 && !hasAssociatedPid ? (
+            <div className="p-3 border rounded-md bg-amber-50 text-amber-800 text-sm">
+              No hay conductores disponibles para seleccionar. Todos los conductores ya están asociados a dispositivos.
+            </div>
           ) : (
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
@@ -570,7 +585,11 @@ export function CheckInForm(): React.JSX.Element {
               <PopoverContent className="w-[300px] p-0 z-50">
                 <Command>
                   <CommandInput placeholder="Buscar conductor..." className="h-9" />
-                  <CommandEmpty>No se encontraron conductores.</CommandEmpty>
+                  <CommandEmpty>
+                    {hasAssociatedPid 
+                      ? "No se encontraron conductores con ese nombre." 
+                      : "No hay conductores disponibles sin asignación previa."}
+                  </CommandEmpty>
                   <CommandGroup>
                     {drivers.map((driver) => (
                       <CommandItem
@@ -588,6 +607,11 @@ export function CheckInForm(): React.JSX.Element {
                 </Command>
               </PopoverContent>
             </Popover>
+          )}
+          {!isNameLocked && !isLoadingDrivers && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Solo puedes seleccionar conductores que no estén asociados a un dispositivo.
+            </p>
           )}
         </div>
 
