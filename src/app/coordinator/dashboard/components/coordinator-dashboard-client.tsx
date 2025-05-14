@@ -5,7 +5,7 @@ import { DriverQueue } from './driver-queue';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2, LogOut, AlertTriangle } from 'lucide-react';
 import { store } from '@/lib/store';
 import type { WaitingDriver, DispatchRecord, FraudAlert } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 
 export function CoordinatorDashboardClient() {
+  const { subscribe } = store; // Import subscribe explicitly
   const { isLoading, isAuthenticated, role } = useAuthCheck('coordinator');
   const router = useRouter();
 
@@ -26,7 +27,7 @@ export function CoordinatorDashboardClient() {
   
   useEffect(() => {
     refreshData(); // Initial load
-    const unsubscribe = store.subscribe(refreshData);
+    const unsubscribe = subscribe(refreshData); // Use the imported subscribe function
     return () => unsubscribe();
   }, [refreshData]);
 
