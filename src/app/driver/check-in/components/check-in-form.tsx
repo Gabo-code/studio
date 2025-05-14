@@ -424,9 +424,18 @@ export function CheckInForm(): React.JSX.Element {
       // Añadir el conductor a la lista de espera
       const result = store.addWaitingDriver(waitingDriverData);
       
-      if (result.success) {
-        router.push('/');
-      } else {
+      // Siempre redirigir a la página principal después de que el registro en la base de datos fue exitoso
+      // Incluso si el conductor ya está en la lista de espera, el registro en la tabla dispatch_records se realizó correctamente
+      router.push('/');
+      
+      // Si el conductor ya está en la lista de espera, mostrar un mensaje informativo en vez de un error
+      if (!result.success && result.alert?.type === "duplicateId") {
+        toast({
+          title: "Registro Exitoso",
+          description: "Tu asistencia ya estaba registrada. Espera a que el coordinador te asigne un viaje.",
+          variant: "default" // Usar variante default (no destructive) para indicar que no es un error
+        });
+      } else if (!result.success) {
         setFormError(result.alert?.message || 'Error al registrar el conductor');
       }
       
