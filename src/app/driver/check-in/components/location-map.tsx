@@ -30,8 +30,7 @@ interface LocationMapProps {
 const jumboLocation: LatLngExpression = [JUMBO_LATITUDE, JUMBO_LONGITUDE];
 
 function MapEffect({ userLocation, mapRef }: { userLocation: LatLngExpression | null, mapRef: React.MutableRefObject<LeafletMap | null> }) {
-  const map = useMap();
-  mapRef.current = map;
+  const map = mapRef.current;
 
   useEffect(() => {
     if (map) {
@@ -114,10 +113,15 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
 
   return (
     <div className="space-y-3">
-      {isClient ? (
+      {/* Conditional rendering to ensure MapContainer is only rendered on the client */}
+      {isClient && (
         <MapContainer 
           center={jumboLocation} 
           zoom={13} 
+          whenCreated={(mapInstance) => {
+            // Store the map instance in the ref when created
+            mapRef.current = mapInstance;
+          }}
           scrollWheelZoom={false} 
           style={mapStyle} 
           className="rounded-md border shadow-sm"
@@ -137,9 +141,7 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
           )}
           <MapEffect userLocation={userLocation} mapRef={mapRef} />
         </MapContainer>
-      ) : (
-        <MapPlaceholder />
-      )}
+      )}      
       <Button type="button" onClick={verifyLocation} disabled={status === 'loading' || !isClient} variant="outline" className="w-full">
         {status === 'loading' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
         {status === 'loading' ? 'Verifying Location...' : 'Refresh Location'}
