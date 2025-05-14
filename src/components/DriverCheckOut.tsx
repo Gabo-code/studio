@@ -90,8 +90,6 @@ export default function DriverCheckOut() {
       // Actualizar el registro en dispatch_records
       const updates = {
         end_time: new Date().toISOString(),
-        endlatitude: location.latitude,
-        endlongitude: location.longitude,
         status: 'completado'
       };
 
