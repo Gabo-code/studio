@@ -39,7 +39,7 @@ const loadState = () => {
   }
 };
 
-let saveState = () => {
+let saveState = () => { // Changed const to let
   if (typeof window !== 'undefined') {
     localStorage.setItem('jumboDispatchAppState', JSON.stringify(state));
   }
