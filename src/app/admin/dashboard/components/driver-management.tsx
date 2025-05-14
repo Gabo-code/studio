@@ -38,6 +38,10 @@ export function DriverManagement() {
   const [formData, setFormData] = useState({ id: '', name: '', vehicle_type: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [nameFilter, setNameFilter] = useState('');
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('todos');
+  const [statusFilter, setStatusFilter] = useState('todos');
+  const [linkedFilter, setLinkedFilter] = useState('todos');
   const { toast } = useToast();
 
   // Función para cargar los conductores directamente desde Supabase
@@ -226,12 +230,33 @@ export function DriverManagement() {
     setFormData({ id: '', name: '', vehicle_type: '' });
   };
   
-  // Filtrar conductores según el término de búsqueda
-  const filteredDrivers = drivers.filter(driver => 
-    driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    driver.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (driver.vehicle_type && driver.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Filtrar conductores con todos los filtros
+  const filteredDrivers = drivers.filter(driver => {
+    // Aplicar filtro general de búsqueda
+    const matchesSearchTerm = searchTerm ? (
+      driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (driver.vehicle_type && driver.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase()))
+    ) : true;
+    
+    // Aplicar filtro específico de nombre
+    const matchesNameFilter = nameFilter ? 
+      driver.name.toLowerCase().includes(nameFilter.toLowerCase()) : true;
+    
+    // Aplicar filtro de tipo de vehículo
+    const matchesVehicleType = vehicleTypeFilter === 'todos' ? true :
+      (driver.vehicle_type && driver.vehicle_type.toLowerCase() === vehicleTypeFilter.toLowerCase());
+    
+    // Aplicar filtro de estado
+    const matchesStatus = statusFilter === 'todos' ? true :
+      driver.status === statusFilter;
+    
+    // Aplicar filtro de vinculación
+    const matchesLinked = linkedFilter === 'todos' ? true :
+      (linkedFilter === 'vinculado' ? !!driver.pid : !driver.pid);
+    
+    return matchesSearchTerm && matchesNameFilter && 
+           matchesVehicleType && matchesStatus && matchesLinked;
+  });
   
   // Función para renderizar el estado del conductor
   const renderStatusBadge = (status: DriverStatus) => {
@@ -350,7 +375,7 @@ export function DriverManagement() {
           </form>
         )}
 
-        {/* Barra de búsqueda */}
+        {/* Barra de búsqueda general */}
         {!isAdding && !isEditing && (
           <div className="relative mb-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -363,92 +388,149 @@ export function DriverManagement() {
           </div>
         )}
 
-        {/* Tabla de conductores */}
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Tipo de Vehículo</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>ID</TableHead>
-                <TableHead>Vinculado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+        {/* Tabla de conductores con filtros específicos por columna */}
+        {!isAdding && !isEditing && (
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-                    <span className="text-muted-foreground">Cargando conductores...</span>
-                  </TableCell>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Tipo de Vehículo</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Vinculado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ) : filteredDrivers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    {searchTerm ? (
-                      <span className="text-muted-foreground">No se encontraron conductores para "{searchTerm}"</span>
-                    ) : (
-                      <span className="text-muted-foreground">No hay conductores registrados</span>
-                    )}
+                <TableRow className="bg-muted/40">
+                  <TableCell>
+                    <Input 
+                      placeholder="Buscar nombre..."
+                      value={nameFilter}
+                      onChange={(e) => setNameFilter(e.target.value)}
+                      className="h-8 text-xs"
+                    />
                   </TableCell>
+                  <TableCell>
+                    <select 
+                      value={vehicleTypeFilter}
+                      onChange={(e) => setVehicleTypeFilter(e.target.value)}
+                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                    >
+                      <option value="todos">Todos</option>
+                      <option value="auto">Auto</option>
+                      <option value="moto">Moto</option>
+                    </select>
+                  </TableCell>
+                  <TableCell>
+                    <select 
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                    >
+                      <option value="todos">Todos</option>
+                      <option value="disponible">Disponible</option>
+                      <option value="ocupado">Ocupado</option>
+                    </select>
+                  </TableCell>
+                  <TableCell>
+                    <select 
+                      value={linkedFilter}
+                      onChange={(e) => setLinkedFilter(e.target.value)}
+                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                    >
+                      <option value="todos">Todos</option>
+                      <option value="vinculado">Vinculado</option>
+                      <option value="no vinculado">No vinculado</option>
+                    </select>
+                  </TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
-              ) : (
-                filteredDrivers.map((driver) => (
-                  <TableRow key={driver.id}>
-                    <TableCell className="font-medium">{driver.name}</TableCell>
-                    <TableCell>{driver.vehicle_type || "-"}</TableCell>
-                    <TableCell>{renderStatusBadge(driver.status || null)}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{driver.id}</TableCell>
-                    <TableCell>
-                      {driver.pid ? (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
-                          Vinculado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-gray-100 text-gray-500">
-                          No vinculado
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          onClick={() => handleEdit(driver)} 
-                          title="Editar conductor"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="icon" 
-                          onClick={() => handleDelete(driver.id)} 
-                          title="Eliminar conductor"
-                          disabled={!!driver.pid}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <span className="text-muted-foreground">Cargando conductores...</span>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : filteredDrivers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      {searchTerm || nameFilter || vehicleTypeFilter !== 'todos' || 
+                       statusFilter !== 'todos' || linkedFilter !== 'todos' ? (
+                        <span className="text-muted-foreground">No se encontraron conductores con los filtros aplicados</span>
+                      ) : (
+                        <span className="text-muted-foreground">No hay conductores registrados</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredDrivers.map((driver) => (
+                    <TableRow key={driver.id}>
+                      <TableCell className="font-medium">{driver.name}</TableCell>
+                      <TableCell>{driver.vehicle_type || "-"}</TableCell>
+                      <TableCell>{renderStatusBadge(driver.status || null)}</TableCell>
+                      <TableCell>
+                        {driver.pid ? (
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                            Vinculado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-gray-100 text-gray-500">
+                            No vinculado
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => handleEdit(driver)} 
+                            title="Editar conductor"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="icon" 
+                            onClick={() => handleDelete(driver.id)} 
+                            title="Eliminar conductor"
+                            disabled={!!driver.pid}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
       {!isAdding && !isEditing && (
         <CardFooter className="flex justify-between border-t p-4">
           <div className="text-sm text-muted-foreground">
             {filteredDrivers.length} {filteredDrivers.length === 1 ? 'conductor' : 'conductores'} 
-            {searchTerm && ` encontrados para "${searchTerm}"`}
+            {(searchTerm || nameFilter || vehicleTypeFilter !== 'todos' || 
+              statusFilter !== 'todos' || linkedFilter !== 'todos') && " encontrados con filtros aplicados"}
           </div>
-          {searchTerm && (
-            <Button variant="ghost" size="sm" onClick={() => setSearchTerm('')}>
-              Limpiar filtro
+          {(searchTerm || nameFilter || vehicleTypeFilter !== 'todos' || 
+            statusFilter !== 'todos' || linkedFilter !== 'todos') && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                setSearchTerm('');
+                setNameFilter('');
+                setVehicleTypeFilter('todos');
+                setStatusFilter('todos');
+                setLinkedFilter('todos');
+              }}
+            >
+              Limpiar filtros
             </Button>
           )}
         </CardFooter>
