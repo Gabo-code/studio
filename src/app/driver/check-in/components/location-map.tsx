@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import type { LatLngExpression, Map as LeafletMap } from 'leaflet'; // Renamed Map to LeafletMap to avoid conflict
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -48,6 +48,7 @@ function MapEffect({ userLocation, mapRef }: { userLocation: LatLngExpression | 
 
 export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMapProps) {
   const [userLocation, setUserLocation] = useState<LatLngExpression | null>(null);
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { toast } = useToast();
@@ -57,7 +58,71 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
   const mapStyle = useMemo(() => ({ height: '250px', width: '100%' }), []);
 
   useEffect(() => {
+    // Initialize the map only once on the client side
+    if (isClient && !mapRef.current) {
+      const map = L.map('map-container', {
+        center: jumboLocation,
+        zoom: 13,
+        scrollWheelZoom: false,
+        // Other map options can be added here
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      L.marker(jumboLocation).addTo(map)
+        .bindPopup('Jumbo Store Location')
+        .openPopup();
+
+      L.circle(jumboLocation, {
+        radius: MAX_DISTANCE_METERS,
+        color: 'hsl(var(--primary))',
+        fillColor: 'hsl(var(--primary))',
+        fillOpacity: 0.2
+      }).addTo(map);
+
+      mapRef.current = map;
+      setIsMapInitialized(true);
+
+      // Cleanup function to remove the map on component unmount
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+          setIsMapInitialized(false);
+        }
+      };
+    }
+    // Set isClient state
     setIsClient(true);
+  }, [isClient]); // Dependency on isClient to ensure it runs after client state is true
+
+  useEffect(() => {
+    // Update user location marker if map is initialized and user location is available
+    if (isMapInitialized && userLocation) {
+      // Remove existing user marker if any
+      mapRef.current.eachLayer((layer) => {
+        if (layer instanceof L.Marker && layer.getPopup()?.getContent() === 'Your Current Location') {
+          mapRef.current.removeLayer(layer);
+        }
+      });
+      L.marker(userLocation, {
+        icon: L.icon({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+          shadowSize: [41, 41]
+        })
+      }).addTo(mapRef.current)
+        .bindPopup('Your Current Location');
+        mapRef.current.setView(userLocation, 16); // Set view to user location
+    } else if (isMapInitialized && !userLocation) {
+       // If user location is null, set view back to jumbo location
+       mapRef.current.setView(jumboLocation, 13);
+    }
   }, []);
 
   const verifyLocation = useCallback(async () => {
@@ -113,35 +178,13 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
 
   return (
     <div className="space-y-3">
-      {/* Conditional rendering to ensure MapContainer is only rendered on the client */}
-      {isClient && (
-        <MapContainer 
-          center={jumboLocation} 
-          zoom={13} 
-          whenCreated={(mapInstance) => {
-            // Store the map instance in the ref when created
-            mapRef.current = mapInstance;
-          }}
-          scrollWheelZoom={false} 
-          style={mapStyle} 
-          className="rounded-md border shadow-sm"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker position={jumboLocation}>
-            <Popup>Jumbo Store Location</Popup>
-          </Marker>
-          <Circle center={jumboLocation} radius={MAX_DISTANCE_METERS} pathOptions={{ color: 'hsl(var(--primary))', fillColor: 'hsl(var(--primary))', fillOpacity: 0.2 }} />
-          {userLocation && (
-            <Marker position={userLocation} icon={L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', iconSize: [25,41], iconAnchor:[12,41], popupAnchor:[1,-34], shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png', shadowSize:[41,41]})}>
-              <Popup>Your Current Location</Popup>
-            </Marker>
-          )}
-          <MapEffect userLocation={userLocation} mapRef={mapRef} />
-        </MapContainer>
-      )}      
+      {/* The div that will contain the Leaflet map */}
+      {isClient ? (
+        <div id="map-container" style={mapStyle} className="rounded-md border shadow-sm"></div>
+      ) : (
+        <MapPlaceholder />
+      )}
+
       <Button type="button" onClick={verifyLocation} disabled={status === 'loading' || !isClient} variant="outline" className="w-full">
         {status === 'loading' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
         {status === 'loading' ? 'Verifying Location...' : 'Refresh Location'}
