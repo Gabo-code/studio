@@ -450,33 +450,19 @@ export function CheckInForm(): React.JSX.Element {
       // Añadir el conductor a la lista de espera
       const result = store.addWaitingDriver(waitingDriverData);
       
-      // Cuando mostramos toast en el caso de éxito o duplicado, aumentar la duración
-      // y hacer más visible el toast
-      
-      // Si el conductor ya está en la lista de espera, mostrar un mensaje informativo en vez de un error
-      if (!result.success && result.alert?.type === "duplicateId") {
-        toast({
-          title: "Registro Exitoso", 
-          description: "Tu asistencia ya estaba registrada. Espera a que el coordinador te asigne un viaje.",
-          variant: "default",
-          duration: 6000
-        });
-        // Redirigir después de un breve retraso
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
-      } else if (!result.success) {
+      // Mostrar mensaje de éxito en cualquier caso (ya sea nuevo registro o duplicado)
+      toast({
+        title: "Registro exitoso",
+        variant: "default",
+        duration: 6000
+      });
+        
+      // Redirigir después de un breve retraso en caso de éxito o duplicado
+      if (!result.success && result.alert?.type !== "duplicateId") {
+        // Solo en caso de error real (no duplicado)
         setFormError(result.alert?.message || 'Error al registrar el conductor');
       } else {
-        // Mostrar mensaje de éxito inmediatamente si todo salió bien
-        toast({
-          title: "¡Registro Exitoso!",
-          description: "Tu asistencia ha sido registrada correctamente.",
-          variant: "default",
-          duration: 6000
-        });
-        
-        // Redirigir después de un breve retraso
+        // En caso de éxito o duplicado ID
         setTimeout(() => {
           router.push('/');
         }, 2000);
