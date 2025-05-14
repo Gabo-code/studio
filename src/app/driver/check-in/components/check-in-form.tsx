@@ -381,6 +381,8 @@ export function CheckInForm(): React.JSX.Element {
       const dispatchRecord = {
         id: uuidv4(),
         driver_id: driverId, // Use the actual driver ID from the database
+        name: name, // Añadir el nombre del conductor (redundante pero útil)
+        pid: persistentId, // Añadir el persistentId del navegador para detectar comportamientos extraños
         start_time: new Date().toISOString(),
         startlatitude: currentLocation?.latitude,
         startlongitude: currentLocation?.longitude,
