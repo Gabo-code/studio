@@ -191,18 +191,49 @@ export function CheckInForm(): React.JSX.Element {
         return;
       }
 
+      // Obtener el ID interno del conductor seleccionado
+      const { data: driverRecord, error: driverError } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('name', name)
+        .single();
+
+      if (driverError || !driverRecord) {
+        throw new Error(`No se pudo obtener el ID del conductor: ${driverError?.message || "Datos no encontrados"}`);
+      }
+
+      // Crear un registro en dispatch_records
+      const dispatchRecord = {
+        driver_id: driverRecord.id, // Usar el ID interno del conductor
+        start_time: new Date().toISOString(),
+        startlatitude: currentLocation.latitude,
+        startlongitude: currentLocation.longitude,
+        status: 'en_curso'
+      };
+
+      const { error: dispatchError } = await supabase
+        .from('dispatch_records')
+        .insert([dispatchRecord]);
+
+      if (dispatchError) {
+        throw new Error(`Error al crear registro de despacho: ${dispatchError.message}`);
+      }
+
       // Actualizar el PID en la tabla drivers para este conductor
       const { error: updateError } = await supabase
         .from('drivers')
-        .update({ pid: persistentId })
-        .eq('name', name);
+        .update({ 
+          pid: persistentId,
+          status: 'ocupado' // Actualizar el estado del conductor a ocupado
+        })
+        .eq('id', driverRecord.id);
 
       if (updateError) {
         throw updateError;
       }
 
-      // Crear el registro de espera
-      const driverData: WaitingDriver = {
+      // Crear el registro de espera para el store local
+      const waitingDriverData: WaitingDriver = {
         id: persistentId,
         name: name.trim(),
         checkInTime: Date.now(),
@@ -210,12 +241,12 @@ export function CheckInForm(): React.JSX.Element {
         location: currentLocation,
       };
 
-      const result = store.addWaitingDriver(driverData);
+      const result = store.addWaitingDriver(waitingDriverData);
 
       if (result.success) {
         toast({
           title: "Check-in Exitoso!",
-          description: `Bienvenido, ${driverData.name}! Estás en la cola.`,
+          description: `Bienvenido, ${name}! Estás en la cola.`,
         });
         
         if(result.alert) { // Fraud alert but still successful check-in
