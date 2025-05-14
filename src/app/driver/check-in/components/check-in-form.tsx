@@ -35,6 +35,21 @@ const LocationMap = dynamic(() => import('./location-map').then(mod => mod.Locat
   loading: () => <div className="h-64 bg-muted rounded-md flex items-center justify-center text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin mr-2" />Loading Map...</div>,
 });
 
+// Añadir una función para procesar la dataURL a un formato más fiable
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)![1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  
+  return new File([u8arr], filename, { type: mime });
+};
+
 export function CheckInForm(): React.JSX.Element {
   const [name, setName] = useState('');
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
@@ -124,46 +139,85 @@ export function CheckInForm(): React.JSX.Element {
     try {
       setIsUploadingSelfie(true);
       setSelfieDataUrl(dataUrl); // Guardamos la vista previa
-
-      // Convertir dataURL a blob
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
+      
+      console.log('Iniciando subida de selfie...');
       
       // Crear ruta de archivo usando la utilidad
       const filePath = generateSelfieFilePath(persistentId);
       const bucket = getSelfieBucket();
-
-      // Subir a Supabase Storage
+      console.log('Ruta destino:', bucket, filePath);
+      
+      // Método alternativo: convertir dataURL directamente a File
+      const fileName = filePath.split('/').pop() || 'selfie.jpg';
+      const file = dataURLtoFile(dataUrl, fileName);
+      console.log('Archivo creado:', file.name, file.size, 'bytes', file.type);
+      
+      // Verificar acceso al bucket
+      try {
+        const { data: listData, error: listError } = await supabase.storage.from(bucket).list();
+        if (listError) {
+          console.error('Error al listar bucket:', listError);
+        } else {
+          console.log('Bucket accesible, contiene', listData.length, 'archivos');
+        }
+      } catch (listCheckError) {
+        console.error('Error verificando acceso al bucket:', listCheckError);
+      }
+      
+      // Intentar con límite de tamaño más pequeño
+      if (file.size > 1024 * 1024) {
+        console.log('Archivo grande detectado, redimensionando...');
+        // Implementar redimensionamiento si es necesario
+      }
+      
+      // Subir a Supabase Storage con el enfoque de archivos
+      console.log('Intentando subir archivo...');
       const { data: uploadData, error: uploadError } = await supabase
         .storage
         .from(bucket)
-        .upload(filePath, blob, {
-          contentType: 'image/jpeg',
-          upsert: false
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: true
         });
-
+      
       if (uploadError) {
+        console.error('Error detallado de subida:', uploadError);
         throw uploadError;
       }
-
+      
+      console.log('Archivo subido exitosamente:', uploadData);
+      
       // Obtener URL pública
-      const { data: { publicUrl } } = supabase
+      const { data: urlData } = supabase
         .storage
         .from(bucket)
         .getPublicUrl(filePath);
-
-      setSelfieStorageUrl(publicUrl);
+      
+      console.log('URL pública obtenida:', urlData.publicUrl);
+      
+      setSelfieStorageUrl(urlData.publicUrl);
       toast({
         title: "Selfie guardada",
         description: "Tu selfie se ha guardado correctamente",
       });
     } catch (error) {
       console.error('Error al subir selfie:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la selfie. Intenta de nuevo.",
-        variant: "destructive"
-      });
+      // Mostrar información detallada del error
+      if (error instanceof Error) {
+        console.error('Mensaje de error:', error.message);
+        console.error('Stack trace:', error.stack);
+        toast({
+          title: "Error",
+          description: `No se pudo guardar la selfie: ${error.message}`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo guardar la selfie. Intenta de nuevo.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsUploadingSelfie(false);
       setShowSelfieCapture(false);

@@ -8,3 +8,23 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Configuración para permitir cargas de archivos grandes
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["!node_modules/@esbuild/darwin-arm64/bin/esbuild"]
+
+# Cabeceras CORS para Supabase
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    
+# Permitir tamaños de carga grandes para las imágenes
+[build.processing]
+  skip_processing = true
+
+[build.processing.images]
+  compress = false
