@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Download, Filter } from 'lucide-react';
 import { Table, TableBody, TableCell, TableCaption, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { format } from 'date-fns';
-
+import { format as dateFormat } from 'date-fns';
 export function Reports() {
   const [dispatchHistory, setDispatchHistory] = useState<DispatchRecord[]>(store.getDispatchHistory());
   
@@ -33,8 +33,8 @@ export function Reports() {
         [
           `"${r.name.replace(/"/g, '""')}"`,
           r.id,
-          format(new Date(r.checkInTime), "yyyy-MM-dd HH:mm:ss"),
-          format(new Date(r.checkoutTime), "yyyy-MM-dd HH:mm:ss"),
+          dateFormat(new Date(r.checkInTime), "yyyy-MM-dd HH:mm:ss"),
+          dateFormat(new Date(r.checkoutTime), "yyyy-MM-dd HH:mm:ss"),
           r.bags,
           `"${String(r.commune).replace(/"/g, '""')}"`,
           r.selfieDataUrl ? 'Yes' : 'No',
@@ -101,8 +101,8 @@ export function Reports() {
               {dispatchHistory.slice(0,10).map((record) => ( // Show recent 10, full list in download
                 <TableRow key={record.id + record.checkoutTime}>
                   <TableCell className="font-medium">{record.name}</TableCell>
-                  <TableCell>{format(new Date(record.checkInTime), "MMM d, HH:mm")}</TableCell>
-                  <TableCell>{format(new Date(record.checkoutTime), "MMM d, HH:mm")}</TableCell>
+                  <TableCell>{dateFormat(new Date(record.checkInTime), "MMM d, HH:mm")}</TableCell>
+                  <TableCell>{dateFormat(new Date(record.checkoutTime), "MMM d, HH:mm")}</TableCell>
                   <TableCell>{record.bags}</TableCell>
                   <TableCell>{record.commune}</TableCell>
                 </TableRow>
