@@ -567,7 +567,7 @@ export function CheckInForm(): React.JSX.Element {
                   <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0">
+              <PopoverContent className="w-[300px] p-0 z-50">
                 <Command>
                   <CommandInput placeholder="Buscar conductor..." className="h-9" />
                   <CommandEmpty>No se encontraron conductores.</CommandEmpty>

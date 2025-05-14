@@ -35,9 +35,9 @@ function MapEffect({ userLocation, mapRef }: { userLocation: LatLngExpression | 
   useEffect(() => {
     if (map) {
       if (userLocation) {
-        map.setView(userLocation, 16); 
+        map.setView(userLocation, 17);
       } else {
-        map.setView(jumboLocation, 13); 
+        map.setView(jumboLocation, 16);
       }
     }
   }, [userLocation, map]);
@@ -55,14 +55,14 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
   const mapRef = useRef<LeafletMap | null>(null);
   const [isClient, setIsClient] = useState(false);
 
-  const mapStyle = useMemo(() => ({ height: '250px', width: '100%' }), []);
+  const mapStyle = useMemo(() => ({ height: '350px', width: '100%' }), []);
 
   useEffect(() => {
     // Initialize the map only once on the client side
     if (isClient && !mapRef.current) {
       const map = L.map('map-container', {
         center: jumboLocation,
-        zoom: 13,
+        zoom: 16,
         scrollWheelZoom: false,
         // Other map options can be added here
       });
@@ -79,7 +79,7 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
         radius: MAX_DISTANCE_METERS,
         color: 'hsl(var(--primary))',
         fillColor: 'hsl(var(--primary))',
-        fillOpacity: 0.2
+        fillOpacity: 0.3
       }).addTo(map);
 
       mapRef.current = map;
@@ -118,12 +118,12 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
         })
       }).addTo(mapRef.current)
         .bindPopup('Your Current Location');
-        mapRef.current.setView(userLocation, 16); // Set view to user location
+        mapRef.current.setView(userLocation, 17);
     } else if (isMapInitialized && !userLocation) {
        // If user location is null, set view back to jumbo location
-       mapRef.current.setView(jumboLocation, 13);
+       mapRef.current.setView(jumboLocation, 16);
     }
-  }, []);
+  }, [isMapInitialized, userLocation]);
 
   const verifyLocation = useCallback(async () => {
     if(!isClient) return;
@@ -180,7 +180,7 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
     <div className="space-y-3">
       {/* The div that will contain the Leaflet map */}
       {isClient ? (
-        <div id="map-container" style={mapStyle} className="rounded-md border shadow-sm"></div>
+        <div id="map-container" style={mapStyle} className="rounded-md border shadow-sm relative z-0"></div>
       ) : (
         <MapPlaceholder />
       )}
