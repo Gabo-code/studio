@@ -39,7 +39,7 @@ const loadState = () => {
   }
 };
 
-const saveState = () => {
+let saveState = () => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('jumboDispatchAppState', JSON.stringify(state));
   }
@@ -75,16 +75,16 @@ export const store = {
     const existingByName = state.masterDriverList.find(d => d.name === driver.name);
     const existingById = state.masterDriverList.find(d => d.id === driver.id);
 
+    let generatedAlert: FraudAlert | undefined = undefined;
+
     if (existingByName && existingByName.id !== driver.id) {
-      const alert: FraudAlert = { id: Date.now().toString(), type: 'duplicateName', message: `Driver name '${driver.name}' exists with a different ID. Original ID: ${existingByName.id}. New ID: ${driver.id}.`, driverName: driver.name, persistentId: driver.id, timestamp: Date.now() };
-      state.fraudAlerts.push(alert);
-      saveState();
+      generatedAlert = { id: Date.now().toString(), type: 'duplicateName', message: `Driver name '${driver.name}' exists with a different ID. Original ID: ${existingByName.id}. New ID: ${driver.id}.`, driverName: driver.name, persistentId: driver.id, timestamp: Date.now() };
+      state.fraudAlerts.push(generatedAlert);
       // Allow check-in but flag it
     }
     if (existingById && existingById.name !== driver.name) {
-      const alert: FraudAlert = { id: Date.now().toString(), type: 'nameMismatchOnId', message: `Persistent ID '${driver.id}' is registered to '${existingById.name}', but current check-in is for '${driver.name}'.`, driverName: driver.name, persistentId: driver.id, timestamp: Date.now() };
-      state.fraudAlerts.push(alert);
-      saveState();
+      generatedAlert = { id: Date.now().toString(), type: 'nameMismatchOnId', message: `Persistent ID '${driver.id}' is registered to '${existingById.name}', but current check-in is for '${driver.name}'.`, driverName: driver.name, persistentId: driver.id, timestamp: Date.now() };
+      state.fraudAlerts.push(generatedAlert);
       // Allow check-in but flag it
     }
     
@@ -98,12 +98,14 @@ export const store = {
 
 
     if (state.waitingDrivers.find(d => d.id === driver.id)) {
-      return { success: false, alert: {id: Date.now().toString(), type: "duplicateId", message: "Driver already in waiting list.", driverName: driver.name, persistentId: driver.id, timestamp: Date.now()} }; // Or update existing? For now, prevent duplicate active check-ins.
+      const existingAlert: FraudAlert = {id: Date.now().toString(), type: "duplicateId", message: "Driver already in waiting list.", driverName: driver.name, persistentId: driver.id, timestamp: Date.now()};
+      // If a fraud alert was already generated, prefer that one.
+      return { success: false, alert: generatedAlert || existingAlert }; 
     }
     state.waitingDrivers.push(driver);
     state.waitingDrivers.sort((a, b) => a.checkInTime - b.checkInTime); // Keep sorted by check-in time
     saveState();
-    return { success: true };
+    return { success: true, alert: generatedAlert };
   },
   removeWaitingDriver: (driverId: string): WaitingDriver | undefined => {
     const index = state.waitingDrivers.findIndex(d => d.id === driverId);
@@ -142,9 +144,9 @@ export const subscribe = (listener: () => void) => {
 const notify = () => {
   listeners.forEach(listener => listener());
 };
+
 // Wrap saveState with notify
 const originalSaveState = saveState;
-// @ts-ignore (redefine saveState for notification)
 saveState = () => {
   originalSaveState();
   notify();
