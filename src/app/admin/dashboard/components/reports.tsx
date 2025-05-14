@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { store } from '@/lib/store';
-import type { DispatchRecord } from '@/types';
+import { subscribe, type DispatchRecord } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Download, Filter } from 'lucide-react';
@@ -18,7 +18,7 @@ export function Reports() {
 
   useEffect(() => {
     refreshHistory();
-    const unsubscribe = store.subscribe(refreshHistory);
+    const unsubscribe = subscribe(refreshHistory);
     return () => unsubscribe();
   }, [refreshHistory]);
 
