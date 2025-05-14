@@ -1,6 +1,6 @@
 // IMPORTANT: In a real application, store sensitive data like passwords in environment variables.
-export const COORDINATOR_PASSWORD = "coord_password123";
-export const ADMIN_PASSWORD = "admin_password123";
+export const COORDINATOR_PASSWORD = "coord123";
+export const ADMIN_PASSWORD = "admin123";
 
 export const JUMBO_LATITUDE = -33.564309; 
 export const JUMBO_LONGITUDE = -70.680308;
