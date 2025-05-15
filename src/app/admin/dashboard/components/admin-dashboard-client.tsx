@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Reports } from './reports';
 import { Rankings } from './rankings';
 import { DriverManagement } from './driver-management';
+import { WaitingQueueManager } from './waiting-queue-manager';
 import { store, subscribe } from '@/lib/store';
 import type { FraudAlert } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
@@ -105,13 +106,17 @@ export function AdminDashboardClient() {
       )}
 
       <Tabs defaultValue="drivers" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="drivers">Driver Management</TabsTrigger>
+          <TabsTrigger value="waitingQueue">Cola de Espera</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="rankings">Rankings</TabsTrigger>
         </TabsList>
         <TabsContent value="drivers" className="mt-4 p-4 border rounded-md bg-card shadow">
           <DriverManagement />
+        </TabsContent>
+        <TabsContent value="waitingQueue" className="mt-4 p-4 border rounded-md bg-card shadow">
+          <WaitingQueueManager />
         </TabsContent>
         <TabsContent value="reports" className="mt-4 p-4 border rounded-md bg-card shadow">
           <Reports />
