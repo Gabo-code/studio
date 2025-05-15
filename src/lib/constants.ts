@@ -6,5 +6,6 @@ export const JUMBO_LATITUDE = -33.564309;
 export const JUMBO_LONGITUDE = -70.680308;
 export const MAX_DISTANCE_METERS = 50;
 
-export const AUTH_TOKEN_KEY = "jumbo_dispatch_auth_token";
+// Claves para almacenamiento en localStorage
+export const AUTH_TOKEN_KEY = "jumbo_dispatch_auth_token"; // Usado para almacenar la sesión (dura 24 horas)
 export const PERSISTENT_ID_KEY = "jumbo_driver_persistent_id";

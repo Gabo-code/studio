@@ -3,7 +3,7 @@
 import { useAuthCheck } from '@/hooks/use-auth-check';
 import { DriverQueue } from './driver-queue';
 import { Button } from '@/components/ui/button';
-import { logout } from '@/lib/auth';
+import { logout, extendSession } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { Loader2, LogOut, AlertTriangle } from 'lucide-react';
 import { store, subscribe } from '@/lib/store'; // Import subscribe explicitly
@@ -110,6 +110,34 @@ export function CoordinatorDashboardClient() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Extender la sesión automáticamente al cargar y cuando el usuario interactúa
+  useEffect(() => {
+    // Extender la sesión al cargar el dashboard
+    if (isAuthenticated && role === 'coordinator') {
+      extendSession();
+    }
+
+    // Configurar listener para extender la sesión en interacciones del usuario
+    const extendSessionOnActivity = () => {
+      if (isAuthenticated && role === 'coordinator') {
+        extendSession();
+      }
+    };
+
+    // Eventos comunes de interacción del usuario
+    window.addEventListener('click', extendSessionOnActivity);
+    window.addEventListener('keydown', extendSessionOnActivity);
+    window.addEventListener('mousemove', extendSessionOnActivity, { passive: true });
+    window.addEventListener('scroll', extendSessionOnActivity, { passive: true });
+
+    return () => {
+      window.removeEventListener('click', extendSessionOnActivity);
+      window.removeEventListener('keydown', extendSessionOnActivity);
+      window.removeEventListener('mousemove', extendSessionOnActivity);
+      window.removeEventListener('scroll', extendSessionOnActivity);
+    };
+  }, [isAuthenticated, role]);
 
   const handleLogout = () => {
     logout();
