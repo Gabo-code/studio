@@ -1,29 +1,28 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppLogo } from '@/components/icons/logo';
 import { Users, UserCog, Truck, Clock } from 'lucide-react';
-import { getAuthStatus } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import { getAuthStatus, type UserRole } from '@/lib/auth';
 
 export default function HomePage() {
   const router = useRouter();
 
-  useEffect(() => {
+  const handlePortalClick = (role: UserRole) => (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     const authStatus = getAuthStatus();
     
-    if (authStatus.isAuthenticated) {
-      // Redirigir al dashboard correspondiente según el rol
-      if (authStatus.role === 'admin') {
-        router.replace('/admin/dashboard');
-      } else if (authStatus.role === 'coordinator') {
-        router.replace('/coordinator/dashboard');
-      }
+    if (authStatus.isAuthenticated && authStatus.role === role) {
+      // Si ya está autenticado con el rol correcto, redirigir al dashboard
+      router.push(`/${role}/dashboard`);
+    } else {
+      // Si no está autenticado o tiene un rol diferente, redirigir al login
+      router.push(`/${role}/login`);
     }
-  }, [router]);
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/40 p-4 sm:p-8">
@@ -75,11 +74,13 @@ export default function HomePage() {
             <CardDescription>Manage driver queue and dispatches.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/coordinator/login" legacyBehavior passHref>
-              <Button className="w-full" variant="default">
-                Coordinator Login
-              </Button>
-            </Link>
+            <Button 
+              className="w-full" 
+              variant="default" 
+              onClick={handlePortalClick('coordinator')}
+            >
+              Coordinator Login
+            </Button>
           </CardContent>
         </Card>
 
@@ -90,11 +91,13 @@ export default function HomePage() {
             <CardDescription>Access reports and manage system settings.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/admin/login" legacyBehavior passHref>
-              <Button className="w-full" variant="default">
-                Admin Login
-              </Button>
-            </Link>
+            <Button 
+              className="w-full" 
+              variant="default" 
+              onClick={handlePortalClick('admin')}
+            >
+              Admin Login
+            </Button>
           </CardContent>
         </Card>
       </div>
