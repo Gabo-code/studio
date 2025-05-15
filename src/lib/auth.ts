@@ -2,7 +2,7 @@ import { COORDINATOR_PASSWORD, ADMIN_PASSWORD, AUTH_TOKEN_KEY } from './constant
 
 export type UserRole = 'coordinator' | 'admin';
 
-// Milisegundos para 10 minutos (10 * 60 * 1000) - Cambiado de 24 horas para pruebas
+// Milisegundos para 10 minutos (10 * 60 * 1000)
 const SESSION_EXPIRY_TIME = 600000;
 
 export function login(password: string, role: UserRole): boolean {
@@ -14,7 +14,7 @@ export function login(password: string, role: UserRole): boolean {
   }
 
   if (isValid && typeof window !== 'undefined') {
-    // Guardar token con marca de tiempo para validar expiración de 24 horas
+    // Guardar token con marca de tiempo para validar expiración
     localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify({ 
       role, 
       loggedInAt: Date.now(),
@@ -41,7 +41,7 @@ export function getAuthStatus(): { isAuthenticated: boolean; role: UserRole | nu
       const parsedToken = JSON.parse(token);
       const currentTime = Date.now();
       
-      // Verificar si el token ha expirado (24 horas desde la creación)
+      // Verificar si el token ha expirado
       if (parsedToken.expiresAt && currentTime < parsedToken.expiresAt) {
         return { isAuthenticated: true, role: parsedToken.role };
       } else {
@@ -57,7 +57,7 @@ export function getAuthStatus(): { isAuthenticated: boolean; role: UserRole | nu
   return { isAuthenticated: false, role: null };
 }
 
-// Función para extender la sesión actual por 24 horas más
+// Función para extender la sesión solo para coordinadores
 export function extendSession(): boolean {
   if (typeof window === 'undefined') {
     return false;
@@ -68,11 +68,13 @@ export function extendSession(): boolean {
     try {
       const parsedToken = JSON.parse(token);
       
-      // Actualizar la fecha de expiración a 24 horas desde ahora
-      parsedToken.expiresAt = Date.now() + SESSION_EXPIRY_TIME;
-      
-      localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify(parsedToken));
-      return true;
+      // Solo extender la sesión si es un coordinador
+      if (parsedToken.role === 'coordinator') {
+        parsedToken.expiresAt = Date.now() + SESSION_EXPIRY_TIME;
+        localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify(parsedToken));
+        return true;
+      }
+      return false;
     } catch (e) {
       return false;
     }

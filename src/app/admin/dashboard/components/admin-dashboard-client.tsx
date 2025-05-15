@@ -2,7 +2,7 @@
 
 import { useAuthCheck } from '@/hooks/use-auth-check';
 import { Button } from '@/components/ui/button';
-import { logout, extendSession } from '@/lib/auth';
+import { logout } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { Loader2, LogOut } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,34 +16,6 @@ import { useState, useEffect } from 'react';
 export function AdminDashboardClient() {
   const { isLoading, isAuthenticated, role } = useAuthCheck('admin');
   const router = useRouter();
-
-  // Extender la sesión automáticamente al cargar y cuando el usuario interactúa
-  useEffect(() => {
-    // Extender la sesión al cargar el dashboard
-    if (isAuthenticated && role === 'admin') {
-      extendSession();
-    }
-
-    // Configurar listener para extender la sesión en interacciones del usuario
-    const extendSessionOnActivity = () => {
-      if (isAuthenticated && role === 'admin') {
-        extendSession();
-      }
-    };
-
-    // Eventos comunes de interacción del usuario
-    window.addEventListener('click', extendSessionOnActivity);
-    window.addEventListener('keydown', extendSessionOnActivity);
-    window.addEventListener('mousemove', extendSessionOnActivity, { passive: true });
-    window.addEventListener('scroll', extendSessionOnActivity, { passive: true });
-
-    return () => {
-      window.removeEventListener('click', extendSessionOnActivity);
-      window.removeEventListener('keydown', extendSessionOnActivity);
-      window.removeEventListener('mousemove', extendSessionOnActivity);
-      window.removeEventListener('scroll', extendSessionOnActivity);
-    };
-  }, [isAuthenticated, role]);
 
   const handleLogout = () => {
     logout();

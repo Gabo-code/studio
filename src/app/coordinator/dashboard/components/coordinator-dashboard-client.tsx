@@ -98,32 +98,11 @@ export function CoordinatorDashboardClient() {
     return () => clearInterval(interval);
   }, [loadActiveDrivers]);
 
-  // Extender la sesión automáticamente al cargar y cuando el usuario interactúa
+  // Extender la sesión solo una vez al cargar el dashboard
   useEffect(() => {
-    // Extender la sesión al cargar el dashboard
     if (isAuthenticated && role === 'coordinator') {
       extendSession();
     }
-
-    // Configurar listener para extender la sesión en interacciones del usuario
-    const extendSessionOnActivity = () => {
-      if (isAuthenticated && role === 'coordinator') {
-        extendSession();
-      }
-    };
-
-    // Eventos comunes de interacción del usuario
-    window.addEventListener('click', extendSessionOnActivity);
-    window.addEventListener('keydown', extendSessionOnActivity);
-    window.addEventListener('mousemove', extendSessionOnActivity, { passive: true });
-    window.addEventListener('scroll', extendSessionOnActivity, { passive: true });
-
-    return () => {
-      window.removeEventListener('click', extendSessionOnActivity);
-      window.removeEventListener('keydown', extendSessionOnActivity);
-      window.removeEventListener('mousemove', extendSessionOnActivity);
-      window.removeEventListener('scroll', extendSessionOnActivity);
-    };
   }, [isAuthenticated, role]);
 
   const handleLogout = () => {
@@ -135,6 +114,11 @@ export function CoordinatorDashboardClient() {
   const handleCheckoutDriver = async (recordId: string) => {
     setIsLoading(true);
     try {
+      // Extender la sesión solo cuando se marca la salida de un conductor
+      if (isAuthenticated && role === 'coordinator') {
+        extendSession();
+      }
+      
       // 1. Obtener el registro actual para tener los datos del conductor
       const { data: recordData, error: recordError } = await supabase
         .from('dispatch_records')
