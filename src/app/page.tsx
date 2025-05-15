@@ -29,10 +29,10 @@ export default function HomePage() {
       <header className="mb-12 text-center">
         <AppLogo className="mx-auto mb-4 h-16 w-auto" />
         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-          Jumbo Dispatch Tracker
+          Seguimiento de Despachos Jumbo
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Efficiently manage driver check-ins and deliveries.
+          Gestiona eficientemente el check-in y los despachos de conductores.
         </p>
       </header>
 
@@ -40,13 +40,13 @@ export default function HomePage() {
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader>
             <Truck className="h-10 w-10 text-primary mb-2" />
-            <CardTitle className="text-2xl">Driver Portal</CardTitle>
-            <CardDescription>Check-in to the dispatch queue.</CardDescription>
+            <CardTitle className="text-2xl">Portal de Conductores</CardTitle>
+            <CardDescription>Realiza tu check-in en la cola de despacho.</CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/driver/check-in" legacyBehavior passHref>
               <Button className="w-full" variant="default">
-                Go to Driver Check-in
+                Ir al Check-in de Conductores
               </Button>
             </Link>
           </CardContent>
@@ -55,13 +55,13 @@ export default function HomePage() {
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader>
             <Clock className="h-10 w-10 text-primary mb-2" />
-            <CardTitle className="text-2xl">Waiting Portal</CardTitle>
-            <CardDescription>View your position in the waiting queue.</CardDescription>
+            <CardTitle className="text-2xl">Portal de Espera</CardTitle>
+            <CardDescription>Consulta tu posición en la lista de espera.</CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/waiting" legacyBehavior passHref>
               <Button className="w-full" variant="default">
-                View Waiting List
+                Ver Lista de Espera
               </Button>
             </Link>
           </CardContent>
@@ -70,8 +70,8 @@ export default function HomePage() {
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader>
             <Users className="h-10 w-10 text-primary mb-2" />
-            <CardTitle className="text-2xl">Coordinator Portal</CardTitle>
-            <CardDescription>Manage driver queue and dispatches.</CardDescription>
+            <CardTitle className="text-2xl">Portal de Coordinadores</CardTitle>
+            <CardDescription>Gestiona la cola y los despachos de conductores.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button 
@@ -79,7 +79,7 @@ export default function HomePage() {
               variant="default" 
               onClick={handlePortalClick('coordinator')}
             >
-              Coordinator Login
+              Ingreso Coordinador
             </Button>
           </CardContent>
         </Card>
@@ -87,8 +87,8 @@ export default function HomePage() {
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader>
             <UserCog className="h-10 w-10 text-primary mb-2" />
-            <CardTitle className="text-2xl">Admin Portal</CardTitle>
-            <CardDescription>Access reports and manage system settings.</CardDescription>
+            <CardTitle className="text-2xl">Portal de Administradores</CardTitle>
+            <CardDescription>Accede a reportes y configura el sistema.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button 
@@ -96,14 +96,14 @@ export default function HomePage() {
               variant="default" 
               onClick={handlePortalClick('admin')}
             >
-              Admin Login
+              Ingreso Administrador
             </Button>
           </CardContent>
         </Card>
       </div>
 
       <footer className="mt-16 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} Jumbo Dispatch. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Jumbo Dispatch. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
