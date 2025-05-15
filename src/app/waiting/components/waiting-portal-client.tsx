@@ -6,6 +6,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, User, AlertCircle, Check } from 'lucide-react';
 import { WaitingList } from '.';
 import { usePersistentId } from '@/hooks/use-persistent-id';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 // Interface para los conductores en espera (simplificada)
 interface WaitingDriver {
@@ -20,6 +24,10 @@ export function WaitingPortalClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [userPosition, setUserPosition] = useState<number | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [showTomorrowList, setShowTomorrowList] = useState(false);
+  const [tomorrowDrivers, setTomorrowDrivers] = useState<WaitingDriver[]>([]);
+  const [isLoadingTomorrow, setIsLoadingTomorrow] = useState(false);
+  const [tomorrowError, setTomorrowError] = useState<string | null>(null);
   
   const persistentId = usePersistentId();
 
@@ -65,6 +73,46 @@ export function WaitingPortalClient() {
     return () => clearInterval(interval);
   }, [loadWaitingDrivers]);
 
+  // Función para obtener la lista de mañana a las 8AM
+  const loadTomorrowDrivers = async () => {
+    setIsLoadingTomorrow(true);
+    setTomorrowError(null);
+    try {
+      // Calcular la fecha de mañana a las 8:00 AM en Santiago
+      const now = new Date();
+      const santiagoNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+      const tomorrow = new Date(santiagoNow);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(8, 0, 0, 0);
+      const startOfTomorrow = new Date(tomorrow);
+      startOfTomorrow.setHours(8, 0, 0, 0);
+      const endOfTomorrow = new Date(tomorrow);
+      endOfTomorrow.setHours(8, 0, 59, 999); // hasta 59 segundos después
+
+      const { data, error } = await supabase
+        .from('dispatch_records')
+        .select('id, name, start_time, pid')
+        .eq('status', 'pendiente')
+        .gte('start_time', startOfTomorrow.toISOString())
+        .lte('start_time', endOfTomorrow.toISOString())
+        .order('start_time', { ascending: true });
+      if (error) {
+        setTomorrowError('Error al cargar la lista de mañana.');
+        setTomorrowDrivers([]);
+      } else if (data && data.length > 0) {
+        setTomorrowDrivers(data);
+      } else {
+        setTomorrowDrivers([]);
+        setTomorrowError('No hay lista de espera programada para mañana a las 8:00 AM.');
+      }
+    } catch (err) {
+      setTomorrowError('Error inesperado al cargar la lista de mañana.');
+      setTomorrowDrivers([]);
+    } finally {
+      setIsLoadingTomorrow(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
@@ -87,6 +135,15 @@ export function WaitingPortalClient() {
             {totalDrivers} {totalDrivers === 1 ? 'conductor' : 'conductores'}
           </span>
         </h2>
+        <Button
+          variant="outline"
+          onClick={async () => {
+            setShowTomorrowList(true);
+            await loadTomorrowDrivers();
+          }}
+        >
+          Ver lista de mañana 8AM
+        </Button>
       </div>
       
       {/* Indicador de posición del usuario en la lista */}
@@ -127,6 +184,42 @@ export function WaitingPortalClient() {
       ) : (
         <WaitingList drivers={waitingDrivers} />
       )}
+
+      {/* Modal para la lista de mañana */}
+      <Dialog open={showTomorrowList} onOpenChange={setShowTomorrowList}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lista de espera para mañana 8:00 AM</DialogTitle>
+            <DialogDescription>
+              {format(new Date(Date.now() + 24*60*60*1000), "EEEE d 'de' MMMM 'de' yyyy", { locale: es })}
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingTomorrow ? (
+            <div className="flex flex-col items-center justify-center min-h-[100px]">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+              <p className="text-muted-foreground">Cargando lista de mañana...</p>
+            </div>
+          ) : tomorrowDrivers.length > 0 ? (
+            <div className="mt-2">
+              <ul className="space-y-2">
+                {tomorrowDrivers.map((driver, idx) => (
+                  <li key={driver.id} className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">{idx + 1}</span>
+                    <span className="font-medium">{driver.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-4">
+              {tomorrowError || 'No hay lista de espera programada para mañana a las 8:00 AM.'}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTomorrowList(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
