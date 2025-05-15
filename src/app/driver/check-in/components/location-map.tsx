@@ -72,7 +72,7 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
       }).addTo(map);
 
       L.marker(jumboLocation).addTo(map)
-        .bindPopup('Jumbo Store Location')
+        .bindPopup('Ubicación de la tienda Jumbo')
         .openPopup();
 
       L.circle(jumboLocation, {
@@ -143,19 +143,19 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
       onLocationVerified(withinRadius);
       setStatus('success');
       if (withinRadius) {
-        toast({ title: "Location Verified", description: "You are within the allowed range." });
+        toast({ title: "Ubicación verificada", description: "Estás dentro del rango permitido." });
       } else {
-        toast({ title: "Location Alert", description: "You are outside the 50m radius of the Jumbo store.", variant: "destructive" });
+        toast({ title: "Alerta de ubicación", description: "Actualmente estás fuera del radio de 50m para el check-in.", variant: "destructive" });
       }
     } catch (err: any) {
       console.error("Error getting location:", err);
-      let message = "Could not get your location. Please ensure location services are enabled.";
-      if (err.code === 1) message = "Location permission denied. Please enable it in your browser settings.";
-      if (err.code === 2) message = "Location position unavailable. Try again or check your connection.";
-      if (err.code === 3) message = "Location request timed out. Please try again.";
+      let message = "No se pudo obtener tu ubicación. Asegúrate de que los servicios de ubicación estén habilitados.";
+      if (err.code === 1) message = "Permiso de ubicación denegado. Actívalo en la configuración de tu navegador.";
+      if (err.code === 2) message = "Ubicación no disponible. Intenta de nuevo o revisa tu conexión.";
+      if (err.code === 3) message = "La solicitud de ubicación expiró. Intenta de nuevo.";
       
       setErrorMsg(message);
-      toast({ title: "Location Error", description: message, variant: "destructive" });
+      toast({ title: "Error de ubicación", description: message, variant: "destructive" });
       setStatus('error');
       onLocationVerified(false);
       onLocationUpdate(null);
@@ -172,7 +172,7 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
 
   const MapPlaceholder = () => (
     <div style={mapStyle} className="rounded-md border shadow-sm flex items-center justify-center bg-muted text-muted-foreground">
-      <Loader2 className="h-8 w-8 animate-spin mr-2" />Loading Map...
+      <Loader2 className="h-8 w-8 animate-spin mr-2" />Cargando mapa...
     </div>
   );
 
@@ -187,15 +187,15 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
 
       <Button type="button" onClick={verifyLocation} disabled={status === 'loading' || !isClient} variant="outline" className="w-full">
         {status === 'loading' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-        {status === 'loading' ? 'Verifying Location...' : 'Refresh Location'}
+        {status === 'loading' ? 'Verificando ubicación...' : 'Actualizar ubicación'}
       </Button>
       {errorMsg && <p className="text-sm text-destructive">{errorMsg}</p>}
       
       {status === 'success' && userLocation && !isWithinJumboRadius({ latitude: (userLocation as [number, number])[0], longitude: (userLocation as [number, number])[1] }) && (
-        <p className="text-sm text-destructive font-medium">You are currently outside the 50m check-in radius.</p>
+        <p className="text-sm text-destructive font-medium">Actualmente estás fuera del radio de 50m para el check-in.</p>
       )}
       {status === 'success' && userLocation && isWithinJumboRadius({ latitude: (userLocation as [number, number])[0], longitude: (userLocation as [number, number])[1] }) && (
-        <p className="text-sm text-green-600 font-medium">Location verified. You are within range.</p>
+        <p className="text-sm text-green-600 font-medium">Ubicación verificada. Estás dentro del rango.</p>
       )}
       {status === 'success' && !userLocation && (
         <p className="text-sm text-muted-foreground">Could not determine your exact position for radius check.</p>

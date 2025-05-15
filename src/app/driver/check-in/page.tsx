@@ -4,7 +4,7 @@ import { Truck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export const metadata = {
-  title: 'Driver Check-in | Jumbo Dispatch Tracker',
+  title: 'Check-in de Conductor | Seguimiento de Despachos Jumbo',
 };
 
 // Note: Leaflet map and selfie capture require client components.
@@ -14,8 +14,8 @@ export default function DriverCheckInPage() {
   return (
     <div className="container mx-auto max-w-3xl py-8 px-4">
       <PageHeader 
-        title="Driver Check-in" 
-        description="Enter your details to join the dispatch queue."
+        title="Check-in de Conductor" 
+        description="Ingresa tus datos para unirte a la cola de despacho."
         Icon={Truck}
         showLogo={true}
       />
