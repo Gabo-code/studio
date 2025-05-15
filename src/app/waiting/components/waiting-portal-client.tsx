@@ -200,7 +200,7 @@ export function WaitingPortalClient() {
               <p className="text-muted-foreground">Cargando lista de mañana...</p>
             </div>
           ) : tomorrowDrivers.length > 0 ? (
-            <div className="mt-2 overflow-y-auto" style={{ maxHeight: '50vh' }}>
+            <div className="mt-2 flex-1 overflow-y-auto" style={{ maxHeight: '50vh' }}>
               <ul className="space-y-2">
                 {tomorrowDrivers.map((driver, idx) => (
                   <li key={driver.id} className="flex items-center gap-2">
@@ -215,7 +215,7 @@ export function WaitingPortalClient() {
               {tomorrowError || 'No hay lista de espera programada para mañana a las 8:00 AM.'}
             </div>
           )}
-          <DialogFooter className="sticky bottom-0 bg-white pt-4">
+          <DialogFooter className="pt-4">
             <Button variant="outline" onClick={() => setShowTomorrowList(false)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
