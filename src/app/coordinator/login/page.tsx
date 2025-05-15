@@ -19,8 +19,8 @@ export default function CoordinatorLoginPage() {
         <AuthForm
             role="coordinator"
             onLoginSuccess={handleLoginSuccess}
-            title="Coordinator Login"
-            description="Access the driver dispatch management panel."
+            title="Ingreso Coordinador"
+            description="Accede al panel de gestión de despachos de conductores."
         />
     </div>
   );

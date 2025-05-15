@@ -42,18 +42,18 @@ export function AdminDashboardClient() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">System Management</h2>
+        <h2 className="text-2xl font-semibold">Gestión del Sistema</h2>
         <Button onClick={handleLogout} variant="outline">
-          <LogOut className="mr-2 h-4 w-4" /> Logout
+          <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
         </Button>
       </div>
 
       <Tabs defaultValue="drivers" className="w-full">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="drivers">Driver Management</TabsTrigger>
+          <TabsTrigger value="drivers">Gestión de Conductores</TabsTrigger>
           <TabsTrigger value="driverImporter">Importar Conductores</TabsTrigger>
           <TabsTrigger value="waitingQueue">Cola de Espera</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="reports">Reportes</TabsTrigger>
           <TabsTrigger value="rankings">Rankings</TabsTrigger>
         </TabsList>
         <TabsContent value="drivers" className="mt-4 p-4 border rounded-md bg-card shadow">

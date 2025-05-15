@@ -20,8 +20,8 @@ export default function AdminLoginPage() {
         <AuthForm
             role="admin"
             onLoginSuccess={handleLoginSuccess}
-            title="Administrator Login"
-            description="Access system reports, rankings, and settings."
+            title="Ingreso Administrador"
+            description="Accede a reportes, rankings y configuración del sistema."
         />
     </div>
   );

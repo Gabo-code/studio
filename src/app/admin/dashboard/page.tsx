@@ -10,8 +10,8 @@ export default function AdminDashboardPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       <PageHeader 
-        title="Admin Dashboard" 
-        description="Oversee operations, generate reports, and manage drivers."
+        title="Panel de Administración" 
+        description="Supervisa operaciones, genera reportes y administra conductores."
         Icon={UserCog}
         showLogo={true}
       />

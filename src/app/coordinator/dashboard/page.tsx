@@ -12,8 +12,8 @@ export default function CoordinatorDashboardPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       <PageHeader 
-        title="Coordinator Dashboard" 
-        description="Manage waiting drivers and dispatch deliveries."
+        title="Panel de Coordinador" 
+        description="Gestiona conductores en espera y despachos de entregas."
         Icon={Users}
         showLogo={true}
       />
