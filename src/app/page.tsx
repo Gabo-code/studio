@@ -1,10 +1,30 @@
+"use client";
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppLogo } from '@/components/icons/logo';
 import { Users, UserCog, Truck, Clock } from 'lucide-react';
+import { getAuthStatus } from '@/lib/auth';
 
 export default function HomePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const authStatus = getAuthStatus();
+    
+    if (authStatus.isAuthenticated) {
+      // Redirigir al dashboard correspondiente según el rol
+      if (authStatus.role === 'admin') {
+        router.replace('/admin/dashboard');
+      } else if (authStatus.role === 'coordinator') {
+        router.replace('/coordinator/dashboard');
+      }
+    }
+  }, [router]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/40 p-4 sm:p-8">
       <header className="mb-12 text-center">
