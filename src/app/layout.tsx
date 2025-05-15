@@ -8,11 +8,17 @@ import { ClientSetupProvider } from '@/components/client-setup-provider';
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
+  display: 'swap',
+  preload: true,
+  fallback: ['system-ui', 'sans-serif'],
 });
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
+  display: 'swap',
+  preload: true,
+  fallback: ['monospace'],
 });
 
 export const metadata: Metadata = {
@@ -26,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <Head>
         <link
           rel="stylesheet"
@@ -35,7 +41,7 @@ export default function RootLayout({
           crossOrigin=""
         />
       </Head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}>
+      <body className="antialiased font-sans">
         <ClientSetupProvider>
           {children}
         </ClientSetupProvider>
