@@ -10,6 +10,7 @@ import { Reports } from './reports';
 import { Rankings } from './rankings';
 import { DriverManagement } from './driver-management';
 import { WaitingQueueManager } from './waiting-queue-manager';
+import { DriverImporter } from './driver-importer';
 import { store, subscribe } from '@/lib/store';
 import type { FraudAlert } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
@@ -106,14 +107,18 @@ export function AdminDashboardClient() {
       )}
 
       <Tabs defaultValue="drivers" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="drivers">Driver Management</TabsTrigger>
+          <TabsTrigger value="driverImporter">Importar Conductores</TabsTrigger>
           <TabsTrigger value="waitingQueue">Cola de Espera</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="rankings">Rankings</TabsTrigger>
         </TabsList>
         <TabsContent value="drivers" className="mt-4 p-4 border rounded-md bg-card shadow">
           <DriverManagement />
+        </TabsContent>
+        <TabsContent value="driverImporter" className="mt-4 p-4 border rounded-md bg-card shadow">
+          <DriverImporter />
         </TabsContent>
         <TabsContent value="waitingQueue" className="mt-4 p-4 border rounded-md bg-card shadow">
           <WaitingQueueManager />
