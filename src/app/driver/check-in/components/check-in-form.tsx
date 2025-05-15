@@ -6,28 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePersistentId } from '@/hooks/use-persistent-id';
-import { store } from '@/lib/store';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { LOCAL_STORAGE_KEYS } from '@/lib/store';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/lib/supabase';
-import { generateSelfieFilePath, getSelfieBucket } from '@/lib/storage';
-import type { WaitingDriver } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
 import { Loader2, Camera, MapPin, AlertTriangle, Check, Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { SelfieCapture } from './selfie-capture'; 
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { v4 as uuidv4 } from 'uuid';
+import { SelfieCapture } from './selfie-capture';
+import { usePersistentId } from '@/hooks/use-persistent-id';
+import { generateSelfieFilePath, getSelfieBucket } from '@/lib/storage';
 
 // Dynamically import LocationMap as it uses Leaflet which is client-side only
 const LocationMap = dynamic(() => import('./location-map').then(mod => mod.LocationMap), {
@@ -449,35 +439,17 @@ export function CheckInForm(): React.JSX.Element {
         throw dispatchError;
       }
 
-      // Guardar en store local para uso en la aplicación
-      const waitingDriverData: WaitingDriver = {
-        id: persistentId,
-        name,
-        checkInTime: Date.now(),
-        selfieDataUrl: selfieStorageUrl, // Keep for UI purposes
-        location: currentLocation || undefined
-      };
-      
-      // Añadir el conductor a la lista de espera
-      const result = store.addWaitingDriver(waitingDriverData);
-      
-      // Mostrar mensaje de éxito en cualquier caso (ya sea nuevo registro o duplicado)
+      // Mostrar mensaje de éxito
       toast({
         title: "Registro exitoso",
         variant: "default",
         duration: 6000
       });
         
-      // Redirigir después de un breve retraso en caso de éxito o duplicado
-      if (!result.success && result.alert?.type !== "duplicateId") {
-        // Solo en caso de error real (no duplicado)
-        setFormError(result.alert?.message || 'Error al registrar el conductor');
-      } else {
-        // En caso de éxito o duplicado ID
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
-      }
+      // Redirigir después de un breve retraso
+      setTimeout(() => {
+        router.push('/');
+      }, 2000);
       
     } catch (error) {
       console.error('Error during check-in:', error);

@@ -11,27 +11,11 @@ import { Rankings } from './rankings';
 import { DriverManagement } from './driver-management';
 import { WaitingQueueManager } from './waiting-queue-manager';
 import { DriverImporter } from './driver-importer';
-import { store, subscribe } from '@/lib/store';
-import type { FraudAlert } from '@/types';
-import { useState, useEffect, useCallback } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react'; // Keep one import
+import { useState, useEffect } from 'react';
 
 export function AdminDashboardClient() {
   const { isLoading, isAuthenticated, role } = useAuthCheck('admin');
   const router = useRouter();
-
-  const [fraudAlerts, setFraudAlerts] = useState<FraudAlert[]>(store.getFraudAlerts());
-
-  const refreshAlerts = useCallback(() => {
-    setFraudAlerts(store.getFraudAlerts());
-  }, []);
-
-  useEffect(() => {
-    refreshAlerts(); // Initial load
-    const unsubscribe = subscribe(refreshAlerts); // Subscribe to store changes using the exported subscribe function
-    return () => unsubscribe(); // Cleanup subscription
-  }, [refreshAlerts]);
 
   // Extender la sesión automáticamente al cargar y cuando el usuario interactúa
   useEffect(() => {
@@ -91,20 +75,6 @@ export function AdminDashboardClient() {
           <LogOut className="mr-2 h-4 w-4" /> Logout
         </Button>
       </div>
-
-      {fraudAlerts.length > 0 && (
-        <div className="space-y-2 my-6 p-4 border border-destructive/50 rounded-lg bg-destructive/10">
-          <h3 className="text-xl font-semibold text-destructive">Active Fraud Alerts</h3>
-          {fraudAlerts.map(alert => (
-            <Alert key={alert.id} variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Potential Fraud Detected</AlertTitle>
-              <AlertDescription>{alert.message} (Driver: {alert.driverName}, ID: {alert.persistentId})</AlertDescription>
-            </Alert>
-          ))}
-           <Button onClick={() => { store.clearFraudAlerts(); refreshAlerts(); }} variant="outline" size="sm" className="mt-2 border-destructive text-destructive hover:bg-destructive/20">Clear All Alerts</Button>
-        </div>
-      )}
 
       <Tabs defaultValue="drivers" className="w-full">
         <TabsList className="grid w-full grid-cols-5">

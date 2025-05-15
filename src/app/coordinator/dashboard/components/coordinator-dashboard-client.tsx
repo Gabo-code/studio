@@ -5,11 +5,8 @@ import { DriverQueue } from './driver-queue';
 import { Button } from '@/components/ui/button';
 import { logout, extendSession } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut, AlertTriangle } from 'lucide-react';
-import { store, subscribe } from '@/lib/store'; // Import subscribe explicitly
-import type { WaitingDriver, DispatchRecord, FraudAlert } from '@/types';
+import { Loader2, LogOut } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/lib/supabase';
 
 // Interfaces para mapear los datos de Supabase
@@ -30,7 +27,6 @@ export function CoordinatorDashboardClient() {
 
   const [activeDrivers, setActiveDrivers] = useState<DriverRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [fraudAlerts, setFraudAlerts] = useState<FraudAlert[]>(store.getFraudAlerts());
 
   // Cargar conductores activos desde Supabase
   const loadActiveDrivers = useCallback(async () => {
@@ -101,15 +97,6 @@ export function CoordinatorDashboardClient() {
     const interval = setInterval(loadActiveDrivers, 30000);
     return () => clearInterval(interval);
   }, [loadActiveDrivers]);
-
-  // Cargar alertas de fraude del store
-  useEffect(() => {
-    setFraudAlerts(store.getFraudAlerts());
-    const unsubscribe = subscribe(() => {
-      setFraudAlerts(store.getFraudAlerts());
-    });
-    return () => unsubscribe();
-  }, []);
 
   // Extender la sesión automáticamente al cargar y cuando el usuario interactúa
   useEffect(() => {
@@ -220,20 +207,6 @@ export function CoordinatorDashboardClient() {
           <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
         </Button>
       </div>
-
-      {fraudAlerts.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-destructive">Alertas de Fraude</h3>
-          {fraudAlerts.map(alert => (
-            <Alert key={alert.id} variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Posible fraude detectado</AlertTitle>
-              <AlertDescription>{alert.message}</AlertDescription>
-            </Alert>
-          ))}
-          <Button onClick={() => { store.clearFraudAlerts(); setFraudAlerts([]); }} variant="outline" size="sm">Limpiar alertas</Button>
-        </div>
-      )}
 
       <DriverQueue 
         drivers={activeDrivers} 
