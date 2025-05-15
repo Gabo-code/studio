@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, LogOut } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 
 // Interfaces para mapear los datos de Supabase
 interface DriverRecord {
@@ -24,6 +25,7 @@ interface DriverRecord {
 export function CoordinatorDashboardClient() {
   const { isLoading: authLoading, isAuthenticated, role } = useAuthCheck('coordinator');
   const router = useRouter();
+  const { toast } = useToast();
 
   const [activeDrivers, setActiveDrivers] = useState<DriverRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,6 +162,32 @@ export function CoordinatorDashboardClient() {
     }
   };
 
+  // Nueva función: pasar todos los pendientes a en_curso
+  const handleStartAllPending = async () => {
+    setIsLoading(true);
+    try {
+      const { error, count } = await supabase
+        .from('dispatch_records')
+        .update({ status: 'en_curso' })
+        .eq('status', 'pendiente');
+      if (error) throw error;
+      toast({
+        title: 'Cola iniciada',
+        description: 'Todos los registros pendientes han pasado a "en curso".',
+        variant: 'default',
+      });
+      await loadActiveDrivers();
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo iniciar la cola de espera.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
@@ -187,9 +215,14 @@ export function CoordinatorDashboardClient() {
             {activeDrivers.length} {activeDrivers.length === 1 ? 'conductor' : 'conductores'}
           </span>
         </h2>
-        <Button onClick={handleLogout} variant="outline">
-          <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleStartAllPending} variant="secondary">
+            Iniciar todos los pendientes
+          </Button>
+          <Button onClick={handleLogout} variant="outline">
+            <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
+          </Button>
+        </div>
       </div>
 
       <DriverQueue 

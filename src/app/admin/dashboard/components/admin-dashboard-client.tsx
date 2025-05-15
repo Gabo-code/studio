@@ -49,7 +49,7 @@ export function AdminDashboardClient() {
       </div>
 
       <Tabs defaultValue="drivers" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="flex flex-wrap gap-2 w-full">
           <TabsTrigger value="drivers">Gestión de Conductores</TabsTrigger>
           <TabsTrigger value="driverImporter">Importar Conductores</TabsTrigger>
           <TabsTrigger value="waitingQueue">Cola de Espera</TabsTrigger>

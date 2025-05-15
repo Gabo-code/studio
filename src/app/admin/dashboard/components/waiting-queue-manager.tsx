@@ -137,8 +137,13 @@ export function WaitingQueueManager() {
     
     // Configurar la hora para las 8:00 AM en Santiago de Chile para la fecha actual
     const santiagoDate = getSantiagoTime();
-    const queueDateTime = new Date(santiagoDate);
+    let queueDateTime = new Date(santiagoDate);
     queueDateTime.setHours(8, 0, 0, 0); // 8:00 AM en horario de Chile
+
+    // Si ya pasaron las 8AM, programar para el día siguiente
+    if (santiagoDate.getHours() > 8 || (santiagoDate.getHours() === 8 && santiagoDate.getMinutes() > 0)) {
+      queueDateTime.setDate(queueDateTime.getDate() + 1);
+    }
     
     // Crear una nueva lista para actualizar el estado durante el procesamiento
     const updatedDrivers = [...processedDrivers];
@@ -241,9 +246,10 @@ export function WaitingQueueManager() {
 
       // Mostrar notificación con el resultado
       if (successCount > 0) {
+        const fechaLista = format(queueDateTime, "EEEE d 'de' MMMM 'de' yyyy", { locale: es });
         toast({
           title: "Cola de espera actualizada",
-          description: `${successCount} conductores añadidos a la cola de espera para las 8:00 AM.${errorCount > 0 ? ` ${errorCount} errores.` : ''}`,
+          description: `${successCount} conductores añadidos a la cola de espera para el ${fechaLista} a las 8:00 AM.${errorCount > 0 ? ` ${errorCount} errores.` : ''}`,
           variant: successCount > 0 && errorCount === 0 ? "default" : "destructive"
         });
       } else {
