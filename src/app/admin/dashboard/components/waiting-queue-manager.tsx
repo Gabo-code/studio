@@ -145,119 +145,123 @@ export function WaitingQueueManager() {
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < updatedDrivers.length; i++) {
-      const driver = updatedDrivers[i];
-      
-      try {
-        // Primero verificamos si el conductor ya tiene un registro de despacho pendiente para hoy
-        const { data: existingRecord, error: checkError } = await supabase
-          .from('dispatch_records')
-          .select('id, name')
-          .eq('name', driver.name)
-          .eq('status', 'pendiente')
-          .is('end_time', null)
-          .maybeSingle();
+    try {
+      // Primero, eliminar todos los registros pendientes del día actual
+      const startOfDay = new Date(queueDateTime);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(queueDateTime);
+      endOfDay.setHours(23, 59, 59, 999);
 
-        if (checkError) {
-          throw new Error(`Error verificando registros existentes: ${checkError.message}`);
-        }
+      const { error: deleteError } = await supabase
+        .from('dispatch_records')
+        .delete()
+        .eq('status', 'pendiente')
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString());
 
-        if (existingRecord) {
+      if (deleteError) {
+        throw new Error(`Error eliminando registros anteriores: ${deleteError.message}`);
+      }
+
+      // Ahora procesar los nuevos conductores
+      for (let i = 0; i < updatedDrivers.length; i++) {
+        const driver = updatedDrivers[i];
+        
+        try {
+          // Para conductores que no existen, primero debemos crearlos
+          let driverId = driver.driverId;
+          
+          if (!driver.driverExists) {
+            // Crear nuevo conductor si no existe
+            const newDriverId = uuidv4();
+            const { error: driverError } = await supabase
+              .from('drivers')
+              .insert({
+                id: newDriverId,
+                name: driver.name,
+                status: 'disponible',
+                vehicle_type: null, // Se completará después manualmente
+                pid: null // No tiene pid todavía
+              });
+              
+            if (driverError) {
+              throw new Error(`Error creando nuevo conductor: ${driverError.message}`);
+            }
+            
+            driverId = newDriverId;
+          }
+
+          // Calculamos un tiempo separado para cada conductor
+          // Añadimos i segundos a las 8:00 AM para mantener el orden exacto de la lista
+          const driverTime = new Date(queueDateTime);
+          driverTime.setSeconds(driverTime.getSeconds() + i);
+
+          // Ahora crear el registro de despacho
+          const dispatchId = uuidv4();
+          const { error: dispatchError } = await supabase
+            .from('dispatch_records')
+            .insert({
+              id: dispatchId,
+              driver_id: driverId,
+              name: driver.name,
+              status: 'pendiente',
+              start_time: driverTime.toISOString(),
+              end_time: null,
+              startlatitude: null,
+              startlongitude: null,
+              selfie_url: null,
+              pid: null
+            });
+
+          if (dispatchError) {
+            throw new Error(`Error creando registro de despacho: ${dispatchError.message}`);
+          }
+
+          // Actualizar el estado del conductor en la lista local
+          updatedDrivers[i] = {
+            ...driver,
+            status: 'completado',
+            message: 'Añadido a la cola de espera correctamente'
+          };
+          successCount++;
+        } catch (err) {
+          console.error(`Error procesando conductor ${driver.name}:`, err);
           updatedDrivers[i] = {
             ...driver,
             status: 'error',
-            message: 'El conductor ya tiene un registro pendiente'
+            message: err instanceof Error ? err.message : 'Error desconocido'
           };
           errorCount++;
-          continue;
         }
-
-        // Para conductores que no existen, primero debemos crearlos
-        let driverId = driver.driverId;
-        
-        if (!driver.driverExists) {
-          // Crear nuevo conductor si no existe
-          const newDriverId = uuidv4();
-          const { error: driverError } = await supabase
-            .from('drivers')
-            .insert({
-              id: newDriverId,
-              name: driver.name,
-              status: 'disponible',
-              vehicle_type: null, // Se completará después manualmente
-              pid: null // No tiene pid todavía
-            });
-            
-          if (driverError) {
-            throw new Error(`Error creando nuevo conductor: ${driverError.message}`);
-          }
-          
-          driverId = newDriverId;
-        }
-
-        // Calculamos un tiempo separado para cada conductor
-        // Añadimos i segundos a las 8:00 AM para mantener el orden exacto de la lista
-        const driverTime = new Date(queueDateTime);
-        driverTime.setSeconds(driverTime.getSeconds() + i);
-
-        // Ahora crear el registro de despacho
-        const dispatchId = uuidv4();
-        const { error: dispatchError } = await supabase
-          .from('dispatch_records')
-          .insert({
-            id: dispatchId,
-            driver_id: driverId,
-            name: driver.name,
-            status: 'pendiente',
-            // Usamos el timestamp con segundos progresivos para mantener el orden
-            start_time: driverTime.toISOString(), // Timestamp con el orden preservado
-            end_time: null,
-            startlatitude: null,
-            startlongitude: null,
-            selfie_url: null,
-            pid: null
-          });
-
-        if (dispatchError) {
-          throw new Error(`Error creando registro de despacho: ${dispatchError.message}`);
-        }
-
-        // Actualizar el estado del conductor en la lista local
-        updatedDrivers[i] = {
-          ...driver,
-          status: 'completado',
-          message: 'Añadido a la cola de espera correctamente'
-        };
-        successCount++;
-      } catch (err) {
-        console.error(`Error procesando conductor ${driver.name}:`, err);
-        updatedDrivers[i] = {
-          ...driver,
-          status: 'error',
-          message: err instanceof Error ? err.message : 'Error desconocido'
-        };
-        errorCount++;
       }
-    }
 
-    // Actualizar la lista de conductores con su estado final
-    setProcessedDrivers(updatedDrivers);
-    setHasImported(true);
-    setIsProcessing(false);
+      // Actualizar la lista de conductores con su estado final
+      setProcessedDrivers(updatedDrivers);
+      setHasImported(true);
 
-    // Mostrar notificación con el resultado
-    if (successCount > 0) {
-      toast({
-        title: "Cola de espera creada",
-        description: `${successCount} conductores añadidos a la cola de espera para las 8:00 AM.${errorCount > 0 ? ` ${errorCount} errores.` : ''}`,
-        variant: successCount > 0 && errorCount === 0 ? "default" : "destructive"
-      });
-    } else {
+      // Mostrar notificación con el resultado
+      if (successCount > 0) {
+        toast({
+          title: "Cola de espera actualizada",
+          description: `${successCount} conductores añadidos a la cola de espera para las 8:00 AM.${errorCount > 0 ? ` ${errorCount} errores.` : ''}`,
+          variant: successCount > 0 && errorCount === 0 ? "default" : "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo crear la cola de espera. Revisa los errores.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error al procesar la cola de espera:', err);
       toast({
         title: "Error",
-        description: "No se pudo crear la cola de espera. Revisa los errores.",
+        description: err instanceof Error ? err.message : "Error desconocido al procesar la cola de espera",
         variant: "destructive"
       });
+    } finally {
+      setIsProcessing(false);
     }
   }, [processedDrivers, toast]);
 
