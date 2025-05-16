@@ -341,7 +341,7 @@ export function CheckInForm(): React.JSX.Element {
           dispatch_records!inner(id)
         `)
         .eq('name', name)
-        .eq('dispatch_records.status', 'en_curso')
+        .eq('dispatch_records.status', 'en_cola')
         .maybeSingle();
 
       if (driverError) {
@@ -354,11 +354,11 @@ export function CheckInForm(): React.JSX.Element {
 
       // Validaciones de estado
       if (driverData.dispatch_records && driverData.dispatch_records.length > 0) {
-        throw new Error('Ya tienes un registro activo en el sistema. Espera a que el coordinador marque tu salida.');
+        throw new Error('Ya estás en la cola de espera. Espera a que el coordinador te asigne un viaje.');
       }
 
-      if (driverData.status === 'ocupado') {
-        throw new Error('Ya estás registrado y en estado OCUPADO. Espera a que el coordinador marque tu salida.');
+      if (driverData.status === 'en_espera') {
+        throw new Error('Ya estás en la cola de espera. Espera a que el coordinador te asigne un viaje.');
       }
 
       if (driverData.bags_balance > 0) {
@@ -374,7 +374,7 @@ export function CheckInForm(): React.JSX.Element {
         start_time: new Date().toISOString(),
         startlatitude: currentLocation?.latitude,
         startlongitude: currentLocation?.longitude,
-        status: 'en_curso',
+        status: 'en_cola',
         selfie_url: selfieStorageUrl,
         bags_taken: 0
       };
@@ -387,7 +387,7 @@ export function CheckInForm(): React.JSX.Element {
       });
 
       if (transactionError) {
-        throw new Error('Error al registrar la asistencia. Es posible que el conductor ya esté ocupado.');
+        throw new Error('Error al registrar en la cola. Es posible que ya estés en espera o en reparto.');
       }
 
       // Éxito - redirigir al portal de espera
@@ -395,7 +395,7 @@ export function CheckInForm(): React.JSX.Element {
 
     } catch (error: unknown) {
       console.error('Error en el proceso de check-in:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error al registrar la asistencia';
+      const errorMessage = error instanceof Error ? error.message : 'Error al registrar en la cola';
       setFormError(errorMessage);
       toast({
         title: "Error",

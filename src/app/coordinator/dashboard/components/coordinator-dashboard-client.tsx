@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthCheck } from '@/hooks/use-auth-check';
-import { DriverQueue } from './driver-queue';
+import { DriverQueue, type DriverRecord } from './driver-queue';
 import { BagsManager } from './bags-manager';
 import { Button } from '@/components/ui/button';
 import { logout, extendSession } from '@/lib/auth';
@@ -20,18 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
-
-// Interfaces para mapear los datos de Supabase
-interface DriverRecord {
-  id: string;
-  driver_id: string;
-  name: string;
-  start_time: string;
-  status: string;
-  selfie_url?: string;
-  pid?: string;
-  vehicle_type?: string;
-}
 
 interface BagsDialogProps {
   isOpen: boolean;
@@ -127,6 +115,8 @@ export function CoordinatorDashboardClient() {
     recordData: any;
     driverName: string;
   } | null>(null);
+  const [hasPendingRecords, setHasPendingRecords] = useState(false);
+  const [hasQueueRecords, setHasQueueRecords] = useState(false);
 
   // Cargar conductores activos desde Supabase
   const loadActiveDrivers = useCallback(async () => {
@@ -190,13 +180,42 @@ export function CoordinatorDashboardClient() {
     }
   }, []);
 
-  // Cargar datos al inicio y refrescar cada 30 segundos
+  // Nueva función para verificar los estados de los registros
+  const checkRecordsStatus = useCallback(async () => {
+    try {
+      // Verificar registros pendientes
+      const { data: pendingData, error: pendingError } = await supabase
+        .from('dispatch_records')
+        .select('id')
+        .eq('status', 'pendiente');
+      
+      if (pendingError) throw pendingError;
+      setHasPendingRecords(pendingData && pendingData.length > 0);
+
+      // Verificar registros en cola
+      const { data: queueData, error: queueError } = await supabase
+        .from('dispatch_records')
+        .select('id')
+        .eq('status', 'en_cola');
+      
+      if (queueError) throw queueError;
+      setHasQueueRecords(queueData && queueData.length > 0);
+    } catch (error) {
+      console.error('Error verificando estados:', error);
+    }
+  }, []);
+
+  // Actualizar el useEffect existente para incluir la verificación
   useEffect(() => {
     loadActiveDrivers();
+    checkRecordsStatus();
     
-    const interval = setInterval(loadActiveDrivers, 30000);
+    const interval = setInterval(() => {
+      loadActiveDrivers();
+      checkRecordsStatus();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [loadActiveDrivers]);
+  }, [loadActiveDrivers, checkRecordsStatus]);
 
   // Extender la sesión solo una vez al cargar el dashboard
   useEffect(() => {
@@ -238,10 +257,10 @@ export function CoordinatorDashboardClient() {
       setIsLoading(false);
       
     } catch (error) {
-      console.error('Error al preparar salida:', error);
+      console.error('Error al preparar despacho:', error);
       toast({
         title: "Error",
-        description: "Error al preparar la salida del conductor. Intente nuevamente.",
+        description: "Error al preparar el despacho del conductor. Intente nuevamente.",
         variant: "destructive"
       });
       setIsLoading(false);
@@ -260,22 +279,20 @@ export function CoordinatorDashboardClient() {
       const { error: updateError } = await supabase
         .from('dispatch_records')
         .update({
-          end_time: new Date().toISOString(),
-          status: 'completado',
+          status: 'despachado',
           bags_taken: bagsCount
         })
         .eq('id', recordId);
       
       if (updateError) throw updateError;
       
-      // 2. Actualizar el saldo de bolsos del conductor
+      // 2. Actualizar el estado del conductor
       if (recordData && recordData.name) {
-        const currentBalance = recordData.drivers?.bags_balance || 0;
         const { error: driverError } = await supabase
           .from('drivers')
           .update({ 
-            status: 'disponible',
-            bags_balance: currentBalance + bagsCount
+            status: 'en_reparto',
+            bags_balance: recordData.drivers?.bags_balance + bagsCount
           })
           .eq('name', recordData.name);
         
@@ -284,13 +301,13 @@ export function CoordinatorDashboardClient() {
         // Mostrar mensaje de éxito con información de bolsos
         if (bagsCount > 0) {
           toast({
-            title: "Salida registrada",
-            description: `Se han entregado ${bagsCount} bolso${bagsCount === 1 ? '' : 's'}. Saldo actual: ${currentBalance + bagsCount} bolso${currentBalance + bagsCount === 1 ? '' : 's'}.`,
+            title: "Conductor despachado",
+            description: `Se han entregado ${bagsCount} bolso${bagsCount === 1 ? '' : 's'}. Saldo actual: ${recordData.drivers?.bags_balance + bagsCount} bolso${recordData.drivers?.bags_balance + bagsCount === 1 ? '' : 's'}.`,
             variant: "default"
           });
         } else {
           toast({
-            title: "Salida registrada",
+            title: "Conductor despachado",
             description: "No se entregaron bolsos en este despacho.",
             variant: "default"
           });
@@ -301,10 +318,10 @@ export function CoordinatorDashboardClient() {
       await loadActiveDrivers();
       
     } catch (error) {
-      console.error('Error al marcar salida:', error);
+      console.error('Error al despachar conductor:', error);
       toast({
         title: "Error",
-        description: "Error al marcar la salida del conductor. Intente nuevamente.",
+        description: "Error al despachar al conductor. Intente nuevamente.",
         variant: "destructive"
       });
     } finally {
@@ -314,18 +331,28 @@ export function CoordinatorDashboardClient() {
     }
   };
 
-  // Nueva función: pasar todos los pendientes a en_curso
+  // Nueva función: pasar todos los pendientes a en_cola
   const handleStartAllPending = async () => {
     setIsLoading(true);
     try {
-      const { error, count } = await supabase
+      // 1. Actualizar los registros de despacho de pendiente a en_cola
+      const { error } = await supabase
         .from('dispatch_records')
-        .update({ status: 'en_curso' })
+        .update({ status: 'en_cola' })
         .eq('status', 'pendiente');
       if (error) throw error;
+
+      // 2. Actualizar el estado de los conductores a en_espera
+      // Nota: Ya no necesitamos distinguir entre turno_terminado e inactivo
+      const { error: driversError } = await supabase
+        .from('drivers')
+        .update({ status: 'en_espera' })
+        .in('status', ['inactivo']);  // Incluye tanto inactivo como los que terminaron turno
+      if (driversError) throw driversError;
+
       toast({
         title: 'Cola iniciada',
-        description: 'Todos los registros pendientes han pasado a "en curso".',
+        description: 'Todos los conductores pendientes han sido añadidos a la cola de espera.',
         variant: 'default',
       });
       await loadActiveDrivers();
@@ -383,6 +410,7 @@ export function CoordinatorDashboardClient() {
             onStartAll={handleStartAllPending}
             vehicleFilter={vehicleFilter}
             onVehicleFilterChange={setVehicleFilter}
+            showStartAllButton={hasPendingRecords && !hasQueueRecords}
           />
         </TabsContent>
 

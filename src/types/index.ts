@@ -28,3 +28,14 @@ export type FraudAlert = {
   persistentId: string;
   timestamp: number;
 };
+
+export type DriverStatus = 
+  | 'en_espera'     // En la cola esperando ser despachado
+  | 'en_reparto'    // Despachado por coordinador, realizando entregas
+  | 'inactivo'      // No está en servicio (incluye fin de turno)
+  | null;           // Estado inicial
+
+export type DispatchStatus = 
+  | 'pendiente'     // Admin lo agregó pero coord no inicia la cola
+  | 'en_cola'       // Conductor anotado en la lista activa
+  | 'despachado'    // Viaje completado

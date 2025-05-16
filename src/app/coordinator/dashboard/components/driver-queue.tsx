@@ -20,8 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Nueva interfaz para los conductores activos
-interface DriverRecord {
+// Interfaces exportadas
+export interface DriverRecord {
   id: string;
   driver_id: string;
   name: string;
@@ -32,12 +32,13 @@ interface DriverRecord {
   vehicle_type?: string;
 }
 
-interface DriverQueueProps {
+export interface DriverQueueProps {
   drivers: DriverRecord[];
   onCheckout: (recordId: string) => void;
   onStartAll: () => void;
   vehicleFilter: 'todos' | 'auto' | 'moto';
   onVehicleFilterChange: (filter: 'todos' | 'auto' | 'moto') => void;
+  showStartAllButton?: boolean;
 }
 
 export function DriverQueue({ 
@@ -45,7 +46,8 @@ export function DriverQueue({
   onCheckout, 
   onStartAll,
   vehicleFilter,
-  onVehicleFilterChange 
+  onVehicleFilterChange,
+  showStartAllButton = true 
 }: DriverQueueProps) {
   const [selectedSelfie, setSelectedSelfie] = useState<string | null>(null);
 
@@ -93,13 +95,15 @@ export function DriverQueue({
             </Select>
           </div>
         </div>
-        <Button 
-          onClick={onStartAll} 
-          variant="secondary"
-          className="w-full sm:w-auto whitespace-nowrap"
-        >
-          Iniciar todos los pendientes
-        </Button>
+        {showStartAllButton && (
+          <Button 
+            onClick={onStartAll} 
+            variant="secondary"
+            className="w-full sm:w-auto whitespace-nowrap"
+          >
+            Iniciar todos los pendientes
+          </Button>
+        )}
       </div>
 
       {drivers.length === 0 ? (

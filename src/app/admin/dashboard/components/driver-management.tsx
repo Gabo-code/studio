@@ -18,12 +18,18 @@ import {
   Search, 
   Users, 
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
-type DriverStatus = 'disponible' | 'ocupado' | 'descanso' | 'inactivo' | null;
+type DriverStatus = 
+  | 'en_espera'     // En la cola esperando ser despachado
+  | 'en_reparto'    // Despachado por coordinador, realizando entregas
+  | 'turno_terminado' // Ha terminado su turno del día
+  | 'inactivo'      // No está en servicio
+  | null;           // Estado inicial
 
 interface DriverWithStatus extends Driver {
   status?: DriverStatus;
@@ -155,7 +161,7 @@ export function DriverManagement() {
             id: formData.id, 
             name: formData.name,
             vehicle_type: formData.vehicle_type || null,
-            status: 'disponible',
+            status: 'inactivo',
             pid: null
           }]);
           
@@ -263,9 +269,9 @@ export function DriverManagement() {
     if (!status) return null;
     
     const statusStyles = {
-      disponible: "bg-green-100 text-green-800 hover:bg-green-200",
-      ocupado: "bg-red-100 text-red-800 hover:bg-red-200",
-      descanso: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
+      en_espera: "bg-green-100 text-green-800 hover:bg-green-200",
+      en_reparto: "bg-red-100 text-red-800 hover:bg-red-200",
+      turno_terminado: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
       inactivo: "bg-gray-100 text-gray-800 hover:bg-gray-200"
     };
     
@@ -274,6 +280,54 @@ export function DriverManagement() {
         {status}
       </Badge>
     );
+  };
+
+  const handleEndShift = async () => {
+    setIsLoading(true);
+    try {
+      // 1. Verificar que no haya registros en cola
+      const { data: queueRecords, error: queueError } = await supabase
+        .from('dispatch_records')
+        .select('id')
+        .eq('status', 'en_cola');
+
+      if (queueError) throw queueError;
+
+      if (queueRecords && queueRecords.length > 0) {
+        toast({
+          title: "Error",
+          description: "No se puede cerrar el turno mientras haya conductores en cola de espera.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // 2. Actualizar todos los conductores en reparto a inactivo
+      const { error: driversError } = await supabase
+        .from('drivers')
+        .update({ status: 'inactivo' })
+        .eq('status', 'en_reparto');
+
+      if (driversError) throw driversError;
+
+      toast({
+        title: "Turno finalizado",
+        description: "Se ha marcado el fin de turno para todos los conductores en reparto.",
+        variant: "default"
+      });
+
+      // Recargar la lista de conductores
+      loadDriversFromDb();
+    } catch (error) {
+      console.error('Error al finalizar turno:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo finalizar el turno. Intente nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -306,6 +360,14 @@ export function DriverManagement() {
                   size="sm"
                 >
                   <UserPlus className="mr-2 h-4 w-4" /> Add Driver
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleEndShift}
+                  disabled={isLoading}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Finalizar Turno
                 </Button>
               </>
             )}
@@ -427,8 +489,10 @@ export function DriverManagement() {
                       className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
                     >
                       <option value="todos">Todos</option>
-                      <option value="disponible">Disponible</option>
-                      <option value="ocupado">Ocupado</option>
+                      <option value="en_espera">En Espera</option>
+                      <option value="en_reparto">En Reparto</option>
+                      <option value="turno_terminado">Turno Terminado</option>
+                      <option value="inactivo">Inactivo</option>
                     </select>
                   </TableCell>
                   <TableCell>

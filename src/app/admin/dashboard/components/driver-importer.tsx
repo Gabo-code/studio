@@ -201,7 +201,7 @@ export function DriverImporter() {
               id: driver.id,
               name: driver.name,
               vehicle_type: driver.vehicleType,
-              status: 'disponible',
+              status: 'inactivo',
               pid: null
             });
             

@@ -184,9 +184,9 @@ export function WaitingQueueManager() {
               .insert({
                 id: newDriverId,
                 name: driver.name,
-                status: 'disponible',
-                vehicle_type: null, // Se completará después manualmente
-                pid: null // No tiene pid todavía
+                status: 'inactivo',
+                vehicle_type: null,
+                pid: null
               });
               
             if (driverError) {
