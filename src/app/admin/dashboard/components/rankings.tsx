@@ -90,14 +90,14 @@ export function Rankings() {
         .select('driver_id, name')
         .gte('start_time', todayStart)
         .lte('start_time', todayEnd)
-        .eq('status', 'completado'); // Solo completados
+        .eq('status', 'despachado'); // Actualizado de 'completado' a 'despachado'
         
       // Direct SQL query for weekly stats  
       const weeklyQueryRaw = await supabase.from('dispatch_records')
         .select('driver_id, name')
         .gte('start_time', weekStart)
         .lte('start_time', weekEnd)
-        .eq('status', 'completado'); // Solo completados
+        .eq('status', 'despachado'); // Actualizado de 'completado' a 'despachado'
         
       if (dailyQueryRaw.error) {
         throw dailyQueryRaw.error;

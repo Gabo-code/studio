@@ -154,9 +154,12 @@ export function Reports() {
     // Aplicar filtro por estado
     let result = filteredByDate;
     if (status === 'completed') {
-      result = filteredByDate.filter(record => record.status === 'completado' || record.end_time !== null);
+      result = filteredByDate.filter(record => record.status === 'despachado');
     } else if (status === 'pending') {
-      result = filteredByDate.filter(record => record.status === 'pendiente' || record.end_time === null);
+      result = filteredByDate.filter(record => 
+        record.status === 'pendiente' || 
+        record.status === 'en_cola'
+      );
     }
 
     setFilteredRecords(result);
@@ -245,7 +248,7 @@ export function Reports() {
 
     // Añadir filtro de estado al nombre
     if (statusFilter !== 'all') {
-      fileName += `_${statusFilter === 'completed' ? 'completados' : 'pendientes'}`;
+      fileName += `_${statusFilter === 'completed' ? 'despachados' : 'pendientes'}`;
     }
 
     if (format === 'csv') {
@@ -268,7 +271,7 @@ export function Reports() {
     } else if (format === 'excel') {
       // Para Excel, generamos un archivo CSV con BOM que Excel reconocerá automáticamente
       const BOM = '\uFEFF'; // BOM para que Excel interprete correctamente los caracteres UTF-8
-      const headers = "Conductor,ID_Conductor,Inicio,Fin,Estado,Latitud,Longitud,Selfie,PID,Vehículo";
+      const headers = "Conductor,ID_Conductor,Inicio,Fin,Estado,Latitud,Longitud,Selfie,PID";
       const rows = filteredRecords.map(r => 
         [
           `"${r.name ? r.name.replace(/"/g, '""') : ''}"`,
@@ -285,7 +288,19 @@ export function Reports() {
       dataStr = BOM + `${headers}\n${rows}`;
       fileName += '.xlsx';
     } else { // JSON
-      dataStr = JSON.stringify(filteredRecords, null, 2);
+      // Asegurarnos de que los datos JSON incluyan todos los campos necesarios
+      const jsonData = filteredRecords.map(r => ({
+        conductor: r.name || '',
+        id_conductor: r.driver_id || '',
+        inicio: r.start_time ? dateFormat(parseISO(r.start_time), "yyyy-MM-dd HH:mm:ss") : '',
+        fin: r.end_time ? dateFormat(parseISO(r.end_time), "yyyy-MM-dd HH:mm:ss") : '',
+        estado: r.status || '',
+        latitud: r.startlatitude || '',
+        longitud: r.startlongitude || '',
+        selfie: r.selfie_url ? 'Sí' : 'No',
+        pid: r.pid || ''
+      }));
+      dataStr = JSON.stringify(jsonData, null, 2);
       fileName += '.json';
     }
 
