@@ -55,12 +55,11 @@ export function WaitingPortalClient() {
           name,
           start_time,
           pid,
-          drivers!inner (
+          drivers!left (
             vehicle_type
           )
         `)
         .eq('status', 'en_curso')
-        .eq('drivers.name', 'dispatch_records.name')
         .order('start_time', { ascending: true }) as { data: DriverWithVehicle[] | null, error: any };
       
       if (dispatchError) {
