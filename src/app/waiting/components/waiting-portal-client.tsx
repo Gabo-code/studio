@@ -16,7 +16,18 @@ interface WaitingDriver {
   id: string;
   name: string;
   start_time: string;
-  pid?: string;
+  pid: string | null;
+  vehicle_type: string | null;
+}
+
+interface DriverWithVehicle {
+  id: string;
+  name: string;
+  start_time: string;
+  pid: string | null;
+  drivers: {
+    vehicle_type: string | null;
+  };
 }
 
 export function WaitingPortalClient() {
@@ -35,27 +46,47 @@ export function WaitingPortalClient() {
   const loadWaitingDrivers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Obtener los registros de despacho con el tipo de vehículo en una sola consulta
+      const { data: driversWithVehicleType, error: dispatchError } = await supabase
         .from('dispatch_records')
-        .select('id, name, start_time, pid')
+        .select(`
+          id,
+          name,
+          start_time,
+          pid,
+          drivers!inner (
+            vehicle_type
+          )
+        `)
         .eq('status', 'en_curso')
-        .order('start_time', { ascending: true });
+        .eq('drivers.name', 'dispatch_records.name')
+        .order('start_time', { ascending: true }) as { data: DriverWithVehicle[] | null, error: any };
       
-      if (error) {
-        console.error('Error cargando conductores en espera:', error);
-      } else {
-        setWaitingDrivers(data || []);
-        
-        // Verificar si el usuario está en la lista de espera
-        if (persistentId) {
-          const userDriverIndex = data?.findIndex(driver => driver.pid === persistentId) ?? -1;
-          if (userDriverIndex !== -1) {
-            setUserPosition(userDriverIndex + 1); // +1 porque el índice empieza en 0
-            setUserName(data?.[userDriverIndex].name || null);
-          } else {
-            setUserPosition(null);
-            setUserName(null);
-          }
+      if (dispatchError) {
+        console.error('Error cargando conductores en espera:', dispatchError);
+        return;
+      }
+
+      // Transformar los datos al formato esperado
+      const formattedDrivers = (driversWithVehicleType || []).map(record => ({
+        id: record.id,
+        name: record.name,
+        start_time: record.start_time,
+        pid: record.pid,
+        vehicle_type: record.drivers?.vehicle_type || null
+      }));
+
+      setWaitingDrivers(formattedDrivers);
+      
+      // Verificar si el usuario está en la lista de espera
+      if (persistentId) {
+        const userDriverIndex = formattedDrivers?.findIndex(driver => driver.pid === persistentId) ?? -1;
+        if (userDriverIndex !== -1) {
+          setUserPosition(userDriverIndex + 1); // +1 porque el índice empieza en 0
+          setUserName(formattedDrivers?.[userDriverIndex].name || null);
+        } else {
+          setUserPosition(null);
+          setUserName(null);
         }
       }
     } catch (err) {
@@ -91,16 +122,33 @@ export function WaitingPortalClient() {
 
       const { data, error } = await supabase
         .from('dispatch_records')
-        .select('id, name, start_time, pid')
+        .select(`
+          id,
+          name,
+          start_time,
+          pid,
+          drivers!inner (
+            vehicle_type
+          )
+        `)
         .eq('status', 'pendiente')
         .gte('start_time', startOfTomorrow.toISOString())
         .lte('start_time', endOfTomorrow.toISOString())
-        .order('start_time', { ascending: true });
+        .order('start_time', { ascending: true }) as { data: DriverWithVehicle[] | null, error: any };
+
       if (error) {
         setTomorrowError('Error al cargar la lista de mañana.');
         setTomorrowDrivers([]);
       } else if (data && data.length > 0) {
-        setTomorrowDrivers(data);
+        // Transformar los datos al formato esperado
+        const formattedDrivers = data.map(record => ({
+          id: record.id,
+          name: record.name,
+          start_time: record.start_time,
+          pid: record.pid,
+          vehicle_type: record.drivers?.vehicle_type || null
+        }));
+        setTomorrowDrivers(formattedDrivers);
       } else {
         setTomorrowDrivers([]);
         setTomorrowError('No hay lista de espera programada para mañana a las 8:00 AM.');
