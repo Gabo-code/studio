@@ -52,3 +52,4 @@ firestore-debug.log
 
 # Supabase
 src/database/check_in_driver.sql
+src/database/cancel_pending_dispatches.sql
