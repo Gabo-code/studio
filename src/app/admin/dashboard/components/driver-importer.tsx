@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 
-type DriverStatus = 'pendiente' | 'completado' | 'error' | 'actualizado';
+type DriverStatus = 'pendiente' | 'creado' | 'error' | 'actualizado';
 
 interface ProcessedDriver {
   id: string;
@@ -209,7 +209,7 @@ export function DriverImporter() {
           
           updatedDrivers[i] = {
             ...driver,
-            status: 'completado',
+            status: 'creado',
             message: 'Conductor creado correctamente'
           };
           newCount++;
@@ -272,7 +272,7 @@ export function DriverImporter() {
               <AlertDescription>
                 <p>Copia desde Excel dos columnas: <strong>Nombre del Conductor</strong> y <strong>Tipo de Vehículo</strong>.</p>
                 <p className="mt-1">Si el conductor ya existe, solo se actualizará el tipo de vehículo manteniendo su ID y otras propiedades.</p>
-                <p className="mt-1">Si es nuevo, se creará con estado "disponible" y sin PID asignado.</p>
+                <p className="mt-1">Si es nuevo, se creará con estado "inactivo" y sin PID asignado.</p>
               </AlertDescription>
             </Alert>
             
@@ -383,7 +383,7 @@ export function DriverImporter() {
               <AlertDescription>
                 <div className="mt-2">
                   <p><strong>Total de conductores:</strong> {processedDrivers.length}</p>
-                  <p><strong>Nuevos:</strong> {processedDrivers.filter(d => d.status === 'completado').length}</p>
+                  <p><strong>Nuevos:</strong> {processedDrivers.filter(d => d.status === 'creado').length}</p>
                   <p><strong>Actualizados:</strong> {processedDrivers.filter(d => d.status === 'actualizado').length}</p>
                   <p><strong>Con errores:</strong> {processedDrivers.filter(d => d.status === 'error').length}</p>
                 </div>
@@ -406,7 +406,7 @@ export function DriverImporter() {
                       <TableCell className="font-medium">{driver.name}</TableCell>
                       <TableCell>{driver.vehicleType}</TableCell>
                       <TableCell>
-                        {driver.status === 'completado' ? (
+                        {driver.status === 'creado' ? (
                           <Badge variant="outline" className="bg-green-50 text-green-800">Creado</Badge>
                         ) : driver.status === 'actualizado' ? (
                           <Badge variant="outline" className="bg-blue-50 text-blue-800">Actualizado</Badge>

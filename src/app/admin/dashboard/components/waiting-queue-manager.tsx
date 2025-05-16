@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 
-type DriverStatus = 'pendiente' | 'completado' | 'error';
+type DriverStatus = 'pendiente' | 'creado' | 'error';
 
 interface ProcessedDriver {
   id: string;
@@ -225,7 +225,7 @@ export function WaitingQueueManager() {
           // Actualizar el estado del conductor en la lista local
           updatedDrivers[i] = {
             ...driver,
-            status: 'completado',
+            status: 'creado',
             message: 'Añadido a la cola de espera correctamente'
           };
           successCount++;
@@ -418,7 +418,7 @@ export function WaitingQueueManager() {
                   <br />
                   <strong>Total de conductores:</strong> {processedDrivers.length}
                   <br />
-                  <strong>Añadidos correctamente:</strong> {processedDrivers.filter(d => d.status === 'completado').length}
+                  <strong>Añadidos correctamente:</strong> {processedDrivers.filter(d => d.status === 'creado').length}
                   <br />
                   <strong>Con errores:</strong> {processedDrivers.filter(d => d.status === 'error').length}
                 </div>
@@ -441,7 +441,7 @@ export function WaitingQueueManager() {
                       <TableCell className="font-mono">{index + 1}</TableCell>
                       <TableCell className="font-medium">{driver.name}</TableCell>
                       <TableCell>
-                        {driver.status === 'completado' ? (
+                        {driver.status === 'creado' ? (
                           <Badge variant="outline" className="bg-green-50 text-green-800">Añadido</Badge>
                         ) : driver.status === 'error' ? (
                           <Badge variant="outline" className="bg-red-50 text-red-800">Error</Badge>
