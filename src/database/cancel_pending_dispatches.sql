@@ -7,13 +7,13 @@ AS $$
 BEGIN
   -- Start transaction
   BEGIN
-    -- Update all dispatch records in queue to cancelled
+    -- Update all dispatch records in queue or pending to cancelled
     UPDATE dispatch_records
     SET 
       status = 'cancelado',
       end_time = NOW()
     WHERE 
-      status = 'en_cola';
+      status IN ('en_cola', 'pendiente');
 
     -- Update all drivers in queue to inactive
     UPDATE drivers
