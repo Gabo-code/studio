@@ -321,28 +321,8 @@ export function CheckInForm(): React.JSX.Element {
   const handleCheckIn = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!name) {
-      setFormError('Se requiere un nombre');
-      return;
-    }
-
-    if (!isLocationVerified) {
-      setFormError('Por favor verifica tu ubicación');
-      return;
-    }
-
-    if (!selfieStorageUrl) {
-      setFormError('Por favor toma una selfie');
-      return;
-    }
-
-    if (!persistentId) {
-      toast({
-        title: "Error",
-        description: "Persistent ID not available. Please refresh.",
-        variant: "destructive",
-        duration: 5000
-      });
+    if (!name || !isLocationVerified || !selfieStorageUrl || !persistentId) {
+      setFormError('Por favor completa todos los campos requeridos');
       return;
     }
 
@@ -350,66 +330,45 @@ export function CheckInForm(): React.JSX.Element {
     setFormError(null);
     
     try {
-      // Verificar si el conductor ya está en estado "ocupado" y su saldo de bolsos
-      const { data: driverCheckData, error: driverStatusError } = await supabase
+      // Una sola consulta para obtener toda la información necesaria
+      const { data: driverData, error: driverError } = await supabase
         .from('drivers')
-        .select('id, status, bags_balance')
+        .select(`
+          id,
+          status,
+          bags_balance,
+          vehicle_type,
+          dispatch_records!inner(id)
+        `)
         .eq('name', name)
+        .eq('dispatch_records.status', 'en_curso')
         .maybeSingle();
-        
-      console.log('📱 VERIFICANDO ESTADO:', driverCheckData);
-      
-      if (driverStatusError) {
+
+      if (driverError) {
         throw new Error('Error al verificar el estado del conductor');
       }
-      
-      if (!driverCheckData) {
-        throw new Error(`No se encontró el conductor con nombre ${name} en la base de datos`);
+
+      if (!driverData) {
+        throw new Error(`No se encontró el conductor con nombre ${name}`);
       }
 
-      if (driverCheckData.status === 'ocupado') {
-        setFormError('Ya estás registrado y en estado OCUPADO. Espera a que el coordinador marque tu salida.');
-        toast({
-          title: "Ya estás registrado",
-          description: "Tu asistencia ya está registrada y estás en estado OCUPADO. Espera a que el coordinador marque tu salida.",
-          variant: "default",
-          duration: 6000
-        });
-        setIsLoading(false);
-        return;
+      // Validaciones de estado
+      if (driverData.dispatch_records && driverData.dispatch_records.length > 0) {
+        throw new Error('Ya tienes un registro activo en el sistema. Espera a que el coordinador marque tu salida.');
       }
 
-      // Verificar si tiene saldo pendiente de bolsos
-      if (driverCheckData.bags_balance > 0) {
-        setFormError('Tienes bolsos pendientes por devolver. Por favor, resuelve el saldo de bolsos en mesón.');
-        toast({
-          title: "Bolsos pendientes",
-          description: `Tienes ${driverCheckData.bags_balance} bolso${driverCheckData.bags_balance === 1 ? '' : 's'} pendiente${driverCheckData.bags_balance === 1 ? '' : 's'} por devolver. Resuelve esto en mesón.`,
-          variant: "destructive",
-          duration: 6000
-        });
-        setIsLoading(false);
-        return;
+      if (driverData.status === 'ocupado') {
+        throw new Error('Ya estás registrado y en estado OCUPADO. Espera a que el coordinador marque tu salida.');
       }
 
-      // Continuar con el proceso de check-in usando el ID del conductor
-      const { error: driverError } = await supabase
-        .from('drivers')
-        .update({
-          pid: persistentId,
-          status: 'ocupado',
-        })
-        .eq('name', name);
+      if (driverData.bags_balance > 0) {
+        throw new Error(`Tienes ${driverData.bags_balance} bolso${driverData.bags_balance === 1 ? '' : 's'} pendiente${driverData.bags_balance === 1 ? '' : 's'} por devolver.`);
+      }
 
-      console.log('📱 PASO 4: Actualización de status a ocupado:', 
-                  { resultado: driverError ? 'ERROR' : 'ÉXITO', error: driverError });
-
-      if (driverError) throw driverError;
-      
-      // Use the actual driver ID from the database for the dispatch record
+      // Crear el registro de despacho y actualizar estado en una sola operación
       const dispatchRecord = {
         id: uuidv4(),
-        driver_id: driverCheckData.id,
+        driver_id: driverData.id,
         name: name,
         pid: persistentId,
         start_time: new Date().toISOString(),
@@ -417,84 +376,33 @@ export function CheckInForm(): React.JSX.Element {
         startlongitude: currentLocation?.longitude,
         status: 'en_curso',
         selfie_url: selfieStorageUrl,
-        bags_taken: 0 // Inicializar en 0, el coordinador lo actualizará si es necesario
+        bags_taken: 0
       };
-      
-      console.log('📱 PASO 5: Creando registro de despacho:', dispatchRecord);
-      
-      const { data: insertData, error: dispatchError } = await supabase
-        .from('dispatch_records')
-        .insert(dispatchRecord)
-        .select();
-        
-      console.log('📱 PASO 6: Resultado creación:', 
-                  { resultado: dispatchError ? 'ERROR' : 'ÉXITO', 
-                    datos: insertData, 
-                    error: dispatchError });
 
-      if (dispatchError) {
-        // Add a special error message if it seems to be a foreign key issue
-        if (dispatchError.message && 
-            (dispatchError.message.includes('foreign key') || 
-             dispatchError.message.includes('violates foreign key constraint'))) {
-          throw new Error(`Error de conexión entre tablas. El ID del conductor no coincide entre tablas.`);
-        }
-        throw dispatchError;
-      }
-
-      // Mostrar mensaje de éxito
-      toast({
-        title: "Registro exitoso",
-        variant: "default",
-        duration: 6000
+      // Usar una transacción para garantizar atomicidad
+      const { error: transactionError } = await supabase.rpc('check_in_driver', {
+        p_driver_name: name,
+        p_persistent_id: persistentId,
+        p_dispatch_data: dispatchRecord
       });
-        
-      // Redirigir después de un breve retraso
-      setTimeout(() => {
-        router.push('/');
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Error during check-in:', error);
-      
-      // Show more detailed error information in the console
-      let errorMessage = 'Error durante el check-in. Por favor intenta nuevamente.';
-      
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-        // Create a shorter, more readable message for the phone
-        const shortMessage = error.message.length > 100 
-          ? error.message.substring(0, 100) + '...' 
-          : error.message;
-        
-        errorMessage = `Error: ${shortMessage}`;
-        
-        // Show toast instead of alert
-        toast({
-          title: "Error de check-in",
-          description: shortMessage,
-          variant: "destructive"
-        });
-      } else if (typeof error === 'object' && error !== null) {
-        // For Supabase errors that aren't standard Error instances
-        const errorObj = error as any;
-        console.error('Error object:', JSON.stringify(errorObj, null, 2));
-        
-        // Extract a useful message for mobile display
-        const supabaseMessage = errorObj.message || errorObj.error || 
-                               (errorObj.details ? errorObj.details.substring(0, 100) : 'Error desconocido');
-        
-        errorMessage = `Error: ${supabaseMessage}`;
-        
-        // Show toast instead of alert
-        toast({
-          title: "Error de base de datos",
-          description: supabaseMessage,
-          variant: "destructive"
-        });
+
+      if (transactionError) {
+        throw new Error('Error al registrar la asistencia. Es posible que el conductor ya esté ocupado.');
       }
-      
+
+      // Éxito - redirigir al portal de espera
+      router.push('/waiting');
+
+    } catch (error: unknown) {
+      console.error('Error en el proceso de check-in:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al registrar la asistencia';
       setFormError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 5000
+      });
     } finally {
       setIsLoading(false);
     }
