@@ -29,6 +29,7 @@ export function CoordinatorDashboardClient() {
 
   const [activeDrivers, setActiveDrivers] = useState<DriverRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [vehicleFilter, setVehicleFilter] = useState<'todos' | 'auto' | 'moto'>('todos');
 
   // Cargar conductores activos desde Supabase
   const loadActiveDrivers = useCallback(async () => {
@@ -188,6 +189,12 @@ export function CoordinatorDashboardClient() {
     }
   };
 
+  // Filtrar conductores según el tipo de vehículo seleccionado
+  const filteredDrivers = activeDrivers.filter(driver => 
+    vehicleFilter === 'todos' ? true : 
+    driver.vehicle_type?.toLowerCase() === vehicleFilter
+  );
+
   if (authLoading || isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
@@ -209,12 +216,23 @@ export function CoordinatorDashboardClient() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">
-          Cola de Conductores
-          <span className="text-lg ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-            {activeDrivers.length} {activeDrivers.length === 1 ? 'conductor' : 'conductores'}
-          </span>
-        </h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-semibold">
+            Cola de Conductores
+            <span className="text-lg ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+              {filteredDrivers.length} {filteredDrivers.length === 1 ? 'conductor' : 'conductores'}
+            </span>
+          </h2>
+          <select
+            value={vehicleFilter}
+            onChange={(e) => setVehicleFilter(e.target.value as 'todos' | 'auto' | 'moto')}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="todos">Todos los vehículos</option>
+            <option value="auto">Solo autos</option>
+            <option value="moto">Solo motos</option>
+          </select>
+        </div>
         <div className="flex gap-2">
           <Button onClick={handleStartAllPending} variant="secondary">
             Iniciar todos los pendientes
@@ -226,7 +244,7 @@ export function CoordinatorDashboardClient() {
       </div>
 
       <DriverQueue 
-        drivers={activeDrivers} 
+        drivers={filteredDrivers} 
         onCheckoutDriver={handleCheckoutDriver} 
       />
     </div>

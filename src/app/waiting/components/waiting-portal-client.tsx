@@ -39,6 +39,7 @@ export function WaitingPortalClient() {
   const [tomorrowDrivers, setTomorrowDrivers] = useState<WaitingDriver[]>([]);
   const [isLoadingTomorrow, setIsLoadingTomorrow] = useState(false);
   const [tomorrowError, setTomorrowError] = useState<string | null>(null);
+  const [vehicleFilter, setVehicleFilter] = useState<'todos' | 'auto' | 'moto'>('todos');
   
   const persistentId = usePersistentId();
 
@@ -161,6 +162,15 @@ export function WaitingPortalClient() {
     }
   };
 
+  // Filtrar conductores según el tipo de vehículo seleccionado
+  const filteredDrivers = waitingDrivers.filter(driver => 
+    vehicleFilter === 'todos' ? true : 
+    driver.vehicle_type?.toLowerCase() === vehicleFilter
+  );
+
+  // Total de conductores filtrados
+  const totalDrivers = filteredDrivers.length;
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
@@ -171,18 +181,26 @@ export function WaitingPortalClient() {
     );
   }
 
-  // Total de conductores en espera
-  const totalDrivers = waitingDrivers.length;
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">
-          Lista de Espera 
-          <span className="text-lg ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-            {totalDrivers} {totalDrivers === 1 ? 'conductor' : 'conductores'}
-          </span>
-        </h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-semibold">
+            Lista de Espera 
+            <span className="text-lg ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+              {totalDrivers} {totalDrivers === 1 ? 'conductor' : 'conductores'}
+            </span>
+          </h2>
+          <select
+            value={vehicleFilter}
+            onChange={(e) => setVehicleFilter(e.target.value as 'todos' | 'auto' | 'moto')}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="todos">Todos los vehículos</option>
+            <option value="auto">Solo autos</option>
+            <option value="moto">Solo motos</option>
+          </select>
+        </div>
         <Button
           variant="outline"
           onClick={async () => {
@@ -226,11 +244,15 @@ export function WaitingPortalClient() {
         <Card className="text-center shadow-sm">
           <CardContent className="p-10">
             <User className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground text-lg">No hay conductores en la lista de espera.</p>
+            <p className="text-muted-foreground text-lg">
+              {vehicleFilter === 'todos' 
+                ? 'No hay conductores en la lista de espera.'
+                : `No hay conductores de ${vehicleFilter === 'auto' ? 'auto' : 'moto'} en la lista de espera.`}
+            </p>
           </CardContent>
         </Card>
       ) : (
-        <WaitingList drivers={waitingDrivers} />
+        <WaitingList drivers={filteredDrivers} />
       )}
 
       {/* Modal para la lista de mañana */}
