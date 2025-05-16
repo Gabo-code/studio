@@ -39,3 +39,4 @@ export type DispatchStatus =
   | 'pendiente'     // Admin lo agregó pero coord no inicia la cola
   | 'en_cola'       // Conductor anotado en la lista activa
   | 'despachado'    // Viaje completado
+  | 'cancelado'     // Cancelado por admin cuando no hay más pedidos

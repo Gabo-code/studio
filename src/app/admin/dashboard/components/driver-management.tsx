@@ -330,6 +330,37 @@ export function DriverManagement() {
     }
   };
 
+  const handleCancelQueue = async () => {
+    if (!window.confirm("¿Estás seguro de que deseas cancelar todos los despachos en cola? Esta acción no se puede deshacer.")) {
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.rpc('cancel_pending_dispatches');
+      
+      if (error) throw error;
+
+      toast({
+        title: "Cola cancelada",
+        description: "Se han cancelado todos los despachos en cola y los conductores han sido marcados como inactivos.",
+        variant: "default"
+      });
+
+      // Recargar la lista de conductores
+      loadDriversFromDb();
+    } catch (error) {
+      console.error('Error al cancelar la cola:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cancelar la cola. Intente nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -368,6 +399,14 @@ export function DriverManagement() {
                 >
                   <Clock className="h-4 w-4 mr-2" />
                   Finalizar Turno
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelQueue}
+                  disabled={isLoading}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancelar Cola
                 </Button>
               </>
             )}
