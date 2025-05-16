@@ -77,6 +77,12 @@ async function uploadWithFetch(file: File, bucketName: string, filePath: string)
   return publicUrl;
 }
 
+interface DriverCheckData {
+  id: string;
+  status: string;
+  bags_balance: number;
+}
+
 export function CheckInForm(): React.JSX.Element {
   const [name, setName] = useState('');
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
@@ -344,20 +350,24 @@ export function CheckInForm(): React.JSX.Element {
     setFormError(null);
     
     try {
-      // Verificar si el conductor ya está en estado "ocupado"
-      const { data: driverStatus, error: driverStatusError } = await supabase
+      // Verificar si el conductor ya está en estado "ocupado" y su saldo de bolsos
+      const { data: driverCheckData, error: driverStatusError } = await supabase
         .from('drivers')
-        .select('status')
+        .select('id, status, bags_balance')
         .eq('name', name)
         .maybeSingle();
         
-      console.log('📱 VERIFICANDO ESTADO:', driverStatus);
+      console.log('📱 VERIFICANDO ESTADO:', driverCheckData);
       
       if (driverStatusError) {
         throw new Error('Error al verificar el estado del conductor');
       }
       
-      if (driverStatus && driverStatus.status === 'ocupado') {
+      if (!driverCheckData) {
+        throw new Error(`No se encontró el conductor con nombre ${name} en la base de datos`);
+      }
+
+      if (driverCheckData.status === 'ocupado') {
         setFormError('Ya estás registrado y en estado OCUPADO. Espera a que el coordinador marque tu salida.');
         toast({
           title: "Ya estás registrado",
@@ -369,28 +379,20 @@ export function CheckInForm(): React.JSX.Element {
         return;
       }
 
-      // Continuar con el resto del proceso de check-in
-      console.log('📱 PASO 1: Buscando conductor con nombre:', name);
-      
-      // First, get the driver's actual ID from the database
-      const { data: driverData, error: getDriverError } = await supabase
-        .from('drivers')
-        .select('id')
-        .eq('name', name)
-        .maybeSingle();
-        
-      console.log('📱 PASO 2: Resultado búsqueda conductor:', 
-                  { conductor: driverData, error: getDriverError });
-      
-      if (getDriverError) throw getDriverError;
-      
-      if (!driverData) {
-        throw new Error(`No se encontró el conductor con nombre ${name} en la base de datos`);
+      // Verificar si tiene saldo pendiente de bolsos
+      if (driverCheckData.bags_balance > 0) {
+        setFormError('Tienes bolsos pendientes por devolver. Por favor, resuelve el saldo de bolsos en mesón.');
+        toast({
+          title: "Bolsos pendientes",
+          description: `Tienes ${driverCheckData.bags_balance} bolso${driverCheckData.bags_balance === 1 ? '' : 's'} pendiente${driverCheckData.bags_balance === 1 ? '' : 's'} por devolver. Resuelve esto en mesón.`,
+          variant: "destructive",
+          duration: 6000
+        });
+        setIsLoading(false);
+        return;
       }
-      
-      const driverId = driverData.id;
-      console.log('📱 PASO 3: ID encontrado:', driverId);
-      
+
+      // Continuar con el proceso de check-in usando el ID del conductor
       const { error: driverError } = await supabase
         .from('drivers')
         .update({
@@ -407,14 +409,15 @@ export function CheckInForm(): React.JSX.Element {
       // Use the actual driver ID from the database for the dispatch record
       const dispatchRecord = {
         id: uuidv4(),
-        driver_id: driverId, // Use the actual driver ID from the database
-        name: name, // Añadir el nombre del conductor (redundante pero útil)
-        pid: persistentId, // Añadir el persistentId del navegador para detectar comportamientos extraños
+        driver_id: driverCheckData.id,
+        name: name,
+        pid: persistentId,
         start_time: new Date().toISOString(),
         startlatitude: currentLocation?.latitude,
         startlongitude: currentLocation?.longitude,
         status: 'en_curso',
-        selfie_url: selfieStorageUrl
+        selfie_url: selfieStorageUrl,
+        bags_taken: 0 // Inicializar en 0, el coordinador lo actualizará si es necesario
       };
       
       console.log('📱 PASO 5: Creando registro de despacho:', dispatchRecord);

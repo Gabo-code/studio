@@ -2,6 +2,7 @@
 
 import { useAuthCheck } from '@/hooks/use-auth-check';
 import { DriverQueue } from './driver-queue';
+import { BagsManager } from './bags-manager';
 import { Button } from '@/components/ui/button';
 import { logout, extendSession } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
@@ -9,6 +10,7 @@ import { Loader2, LogOut } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Interfaces para mapear los datos de Supabase
 interface DriverRecord {
@@ -30,6 +32,7 @@ export function CoordinatorDashboardClient() {
   const [activeDrivers, setActiveDrivers] = useState<DriverRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [vehicleFilter, setVehicleFilter] = useState<'todos' | 'auto' | 'moto'>('todos');
+  const [activeTab, setActiveTab] = useState('cola');
 
   // Cargar conductores activos desde Supabase
   const loadActiveDrivers = useCallback(async () => {
@@ -125,39 +128,81 @@ export function CoordinatorDashboardClient() {
       // 1. Obtener el registro actual para tener los datos del conductor
       const { data: recordData, error: recordError } = await supabase
         .from('dispatch_records')
-        .select('*')
+        .select('*, drivers!inner(bags_balance)')
         .eq('id', recordId)
         .single();
       
       if (recordError) throw recordError;
-      
-      // 2. Actualizar el registro de despacho
+
+      // 2. Preguntar por los bolsos entregados
+      const bagsTaken = window.prompt('¿Cuántos bolsos se llevan?', '0');
+      if (bagsTaken === null) {
+        setIsLoading(false);
+        return;
+      }
+
+      const bagsCount = parseInt(bagsTaken);
+      if (isNaN(bagsCount) || bagsCount < 0) {
+        toast({
+          title: "Error",
+          description: "Por favor ingresa un número válido de bolsos (0 o más).",
+          variant: "destructive"
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. Actualizar el registro de despacho con los bolsos entregados
       const { error: updateError } = await supabase
         .from('dispatch_records')
         .update({
           end_time: new Date().toISOString(),
-          status: 'completado'
+          status: 'completado',
+          bags_taken: bagsCount
         })
         .eq('id', recordId);
       
       if (updateError) throw updateError;
       
-      // 3. Actualizar el estado del conductor a 'disponible'
+      // 4. Actualizar el saldo de bolsos del conductor
       if (recordData && recordData.name) {
+        const currentBalance = recordData.drivers?.bags_balance || 0;
         const { error: driverError } = await supabase
           .from('drivers')
-          .update({ status: 'disponible' })
+          .update({ 
+            status: 'disponible',
+            bags_balance: currentBalance + bagsCount
+          })
           .eq('name', recordData.name);
         
         if (driverError) throw driverError;
+
+        // Mostrar mensaje de éxito con información de bolsos
+        if (bagsCount > 0) {
+          toast({
+            title: "Salida registrada",
+            description: `Se han entregado ${bagsCount} bolso${bagsCount === 1 ? '' : 's'}. Saldo actual: ${currentBalance + bagsCount} bolso${currentBalance + bagsCount === 1 ? '' : 's'}.`,
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Salida registrada",
+            description: "No se entregaron bolsos en este despacho.",
+            variant: "default"
+          });
+        }
       }
       
-      // 4. Recargar la lista actualizada
+      // 5. Recargar la lista actualizada
       await loadActiveDrivers();
       
     } catch (error) {
       console.error('Error al marcar salida:', error);
-      alert('Error al marcar la salida del conductor. Intente nuevamente.');
+      toast({
+        title: "Error",
+        description: "Error al marcar la salida del conductor. Intente nuevamente.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -198,55 +243,47 @@ export function CoordinatorDashboardClient() {
   if (authLoading || isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-2" />
-        <p className="text-lg text-muted-foreground">Cargando conductores activos...</p>
-        <p className="text-sm text-muted-foreground">Por favor espere</p>
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="mt-2 text-sm text-muted-foreground">Cargando...</p>
       </div>
     );
   }
 
   if (!isAuthenticated || role !== 'coordinator') {
-    return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <p className="text-lg text-destructive">Acceso denegado. Redirigiendo...</p>
-      </div>
-    );
+    router.replace('/coordinator/login');
+    return null;
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-semibold">
-            Cola de Conductores
-            <span className="text-lg ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-              {filteredDrivers.length} {filteredDrivers.length === 1 ? 'conductor' : 'conductores'}
-            </span>
-          </h2>
-          <select
-            value={vehicleFilter}
-            onChange={(e) => setVehicleFilter(e.target.value as 'todos' | 'auto' | 'moto')}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="todos">Todos los vehículos</option>
-            <option value="auto">Solo autos</option>
-            <option value="moto">Solo motos</option>
-          </select>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleStartAllPending} variant="secondary">
-            Iniciar todos los pendientes
-          </Button>
-          <Button onClick={handleLogout} variant="outline">
-            <LogOut className="mr-2 h-4 w-4" /> Cerrar sesión
-          </Button>
-        </div>
+    <div className="container mx-auto p-4 space-y-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Panel del Coordinador</h1>
+        <Button variant="outline" onClick={handleLogout}>
+          <LogOut className="h-4 w-4 mr-2" />
+          Cerrar sesión
+        </Button>
       </div>
 
-      <DriverQueue 
-        drivers={filteredDrivers} 
-        onCheckoutDriver={handleCheckoutDriver} 
-      />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="cola">Cola de Conductores</TabsTrigger>
+          <TabsTrigger value="bolsos">Control de Bolsos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cola" className="space-y-4">
+          <DriverQueue
+            drivers={filteredDrivers}
+            onCheckout={handleCheckoutDriver}
+            onStartAll={handleStartAllPending}
+            vehicleFilter={vehicleFilter}
+            onVehicleFilterChange={setVehicleFilter}
+          />
+        </TabsContent>
+
+        <TabsContent value="bolsos">
+          <BagsManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
