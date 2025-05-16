@@ -401,9 +401,10 @@ export function DriverManagement() {
                   Finalizar Turno
                 </Button>
                 <Button
-                  variant="destructive"
+                  variant="secondary"
                   onClick={handleCancelQueue}
                   disabled={isLoading}
+                  className="bg-orange-500 text-white"
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   Cancelar Cola
