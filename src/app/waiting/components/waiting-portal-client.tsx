@@ -182,24 +182,8 @@ export function WaitingPortalClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-semibold">
-            Lista de Espera 
-            <span className="text-lg ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-              {totalDrivers} {totalDrivers === 1 ? 'conductor' : 'conductores'}
-            </span>
-          </h2>
-          <select
-            value={vehicleFilter}
-            onChange={(e) => setVehicleFilter(e.target.value as 'todos' | 'auto' | 'moto')}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="todos">Todos los vehículos</option>
-            <option value="auto">Solo autos</option>
-            <option value="moto">Solo motos</option>
-          </select>
-        </div>
+      {/* Botón de lista de mañana */}
+      <div className="flex justify-start">
         <Button
           variant="outline"
           onClick={async () => {
@@ -209,6 +193,13 @@ export function WaitingPortalClient() {
         >
           Ver lista de mañana 8AM
         </Button>
+      </div>
+
+      {/* Contador de conductores y filtro de vehículos */}
+      <div className="flex justify-between items-center">
+        <span className="text-lg bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+          {totalDrivers} {totalDrivers === 1 ? 'conductor' : 'conductores'}
+        </span>
       </div>
       
       {/* Indicador de posición del usuario en la lista */}
@@ -238,6 +229,17 @@ export function WaitingPortalClient() {
           </div>
         </Card>
       )}
+
+      {/* Filtro de vehículos */}
+      <select
+        value={vehicleFilter}
+        onChange={(e) => setVehicleFilter(e.target.value as 'todos' | 'auto' | 'moto')}
+        className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+      >
+        <option value="todos">Todos los vehículos</option>
+        <option value="auto">Solo autos</option>
+        <option value="moto">Solo motos</option>
+      </select>
 
       {totalDrivers === 0 ? (
         <Card className="text-center shadow-sm">
