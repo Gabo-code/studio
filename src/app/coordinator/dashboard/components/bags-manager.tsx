@@ -7,7 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Search, Package } from 'lucide-react';
+import { Loader2, Search, Package, Plus, Minus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface DriverWithBags {
   id: string;
@@ -15,10 +23,100 @@ interface DriverWithBags {
   bags_balance: number;
 }
 
+interface ReturnDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (amount: number) => void;
+  driverName: string;
+  maxAmount: number;
+}
+
+function ReturnDialog({ isOpen, onClose, onConfirm, driverName, maxAmount }: ReturnDialogProps) {
+  const [amount, setAmount] = useState(0);
+
+  const handleConfirm = () => {
+    onConfirm(amount);
+    setAmount(0); // Reset para la próxima vez
+  };
+
+  const incrementAmount = () => setAmount(prev => prev < maxAmount ? prev + 1 : prev);
+  const decrementAmount = () => setAmount(prev => prev > 0 ? prev - 1 : 0);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={() => {
+      onClose();
+      setAmount(0); // Reset al cerrar
+    }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center">
+            <Package className="mr-2 h-5 w-5" />
+            Devolución de Bolsos
+          </DialogTitle>
+          <DialogDescription>
+            Ingresa la cantidad de bolsos que devuelve {driverName}
+            <div className="mt-1 text-sm font-medium">
+              Máximo a devolver: {maxAmount} bolso{maxAmount === 1 ? '' : 's'}
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-center gap-4 py-6">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={decrementAmount}
+            disabled={amount === 0}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 max-w-[100px]">
+            <Input
+              type="number"
+              value={amount}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (!isNaN(value) && value >= 0 && value <= maxAmount) {
+                  setAmount(value);
+                }
+              }}
+              className="text-center text-lg"
+              min="0"
+              max={maxAmount}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={incrementAmount}
+            disabled={amount === maxAmount}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleConfirm} 
+            disabled={amount === 0 || amount > maxAmount}
+          >
+            Confirmar Devolución
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function BagsManager() {
   const [drivers, setDrivers] = useState<DriverWithBags[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [selectedDriver, setSelectedDriver] = useState<DriverWithBags | null>(null);
   const { toast } = useToast();
 
   // Cargar conductores con saldo de bolsos
@@ -50,35 +148,21 @@ export function BagsManager() {
   }, []);
 
   // Manejar la devolución de bolsos
-  const handleReturnBags = async (driverId: string, currentBalance: number) => {
-    const returnAmount = window.prompt(`¿Cuántos bolsos devuelve? (máximo ${currentBalance})`);
-    if (!returnAmount) return;
+  const handleReturnBags = (driver: DriverWithBags) => {
+    setSelectedDriver(driver);
+    setShowReturnDialog(true);
+  };
 
-    const amount = parseInt(returnAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({
-        title: "Error",
-        description: "Por favor ingresa un número válido mayor a 0.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (amount > currentBalance) {
-      toast({
-        title: "Error",
-        description: `No se pueden devolver más bolsos de los que debe (${currentBalance}).`,
-        variant: "destructive"
-      });
-      return;
-    }
+  // Procesar la confirmación de devolución
+  const handleReturnConfirmed = async (amount: number) => {
+    if (!selectedDriver) return;
 
     setIsLoading(true);
     try {
       const { error } = await supabase
         .from('drivers')
-        .update({ bags_balance: currentBalance - amount })
-        .eq('id', driverId);
+        .update({ bags_balance: selectedDriver.bags_balance - amount })
+        .eq('id', selectedDriver.id);
 
       if (error) throw error;
 
@@ -98,6 +182,8 @@ export function BagsManager() {
       });
     } finally {
       setIsLoading(false);
+      setShowReturnDialog(false);
+      setSelectedDriver(null);
     }
   };
 
@@ -157,7 +243,7 @@ export function BagsManager() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleReturnBags(driver.id, driver.bags_balance)}
+                        onClick={() => handleReturnBags(driver)}
                       >
                         Registrar devolución
                       </Button>
@@ -175,6 +261,19 @@ export function BagsManager() {
           )}
         </div>
       </CardContent>
+
+      {selectedDriver && (
+        <ReturnDialog
+          isOpen={showReturnDialog}
+          onClose={() => {
+            setShowReturnDialog(false);
+            setSelectedDriver(null);
+          }}
+          onConfirm={handleReturnConfirmed}
+          driverName={selectedDriver.name}
+          maxAmount={selectedDriver.bags_balance}
+        />
+      )}
     </Card>
   );
 } 

@@ -6,11 +6,20 @@ import { BagsManager } from './bags-manager';
 import { Button } from '@/components/ui/button';
 import { logout, extendSession } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2, LogOut, Package, Plus, Minus } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
 
 // Interfaces para mapear los datos de Supabase
 interface DriverRecord {
@@ -24,6 +33,85 @@ interface DriverRecord {
   vehicle_type?: string;
 }
 
+interface BagsDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (amount: number) => void;
+  driverName: string;
+}
+
+function BagsDialog({ isOpen, onClose, onConfirm, driverName }: BagsDialogProps) {
+  const [amount, setAmount] = useState(0);
+
+  const handleConfirm = () => {
+    onConfirm(amount);
+    setAmount(0); // Reset para la próxima vez
+  };
+
+  const incrementAmount = () => setAmount(prev => prev + 1);
+  const decrementAmount = () => setAmount(prev => prev > 0 ? prev - 1 : 0);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={() => {
+      onClose();
+      setAmount(0); // Reset al cerrar
+    }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center">
+            <Package className="mr-2 h-5 w-5" />
+            Entrega de Bolsos
+          </DialogTitle>
+          <DialogDescription>
+            Ingresa la cantidad de bolsos que se llevan para {driverName}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-center gap-4 py-6">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={decrementAmount}
+            disabled={amount === 0}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 max-w-[100px]">
+            <Input
+              type="number"
+              value={amount}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (!isNaN(value) && value >= 0) {
+                  setAmount(value);
+                }
+              }}
+              className="text-center text-lg"
+              min="0"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={incrementAmount}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirm} disabled={amount < 0}>
+            Confirmar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function CoordinatorDashboardClient() {
   const { isLoading: authLoading, isAuthenticated, role } = useAuthCheck('coordinator');
   const router = useRouter();
@@ -33,6 +121,12 @@ export function CoordinatorDashboardClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [vehicleFilter, setVehicleFilter] = useState<'todos' | 'auto' | 'moto'>('todos');
   const [activeTab, setActiveTab] = useState('cola');
+  const [showBagsDialog, setShowBagsDialog] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<{
+    recordId: string;
+    recordData: any;
+    driverName: string;
+  } | null>(null);
 
   // Cargar conductores activos desde Supabase
   const loadActiveDrivers = useCallback(async () => {
@@ -134,25 +228,35 @@ export function CoordinatorDashboardClient() {
       
       if (recordError) throw recordError;
 
-      // 2. Preguntar por los bolsos entregados
-      const bagsTaken = window.prompt('¿Cuántos bolsos se llevan?', '0');
-      if (bagsTaken === null) {
-        setIsLoading(false);
-        return;
-      }
+      // 2. Mostrar el diálogo de bolsos
+      setCheckoutData({
+        recordId,
+        recordData,
+        driverName: recordData.name
+      });
+      setShowBagsDialog(true);
+      setIsLoading(false);
+      
+    } catch (error) {
+      console.error('Error al preparar salida:', error);
+      toast({
+        title: "Error",
+        description: "Error al preparar la salida del conductor. Intente nuevamente.",
+        variant: "destructive"
+      });
+      setIsLoading(false);
+    }
+  };
 
-      const bagsCount = parseInt(bagsTaken);
-      if (isNaN(bagsCount) || bagsCount < 0) {
-        toast({
-          title: "Error",
-          description: "Por favor ingresa un número válido de bolsos (0 o más).",
-          variant: "destructive"
-        });
-        setIsLoading(false);
-        return;
-      }
+  // Nueva función para procesar la confirmación de bolsos
+  const handleBagsConfirmed = async (bagsCount: number) => {
+    if (!checkoutData) return;
+    
+    setIsLoading(true);
+    try {
+      const { recordId, recordData } = checkoutData;
 
-      // 3. Actualizar el registro de despacho con los bolsos entregados
+      // 1. Actualizar el registro de despacho con los bolsos entregados
       const { error: updateError } = await supabase
         .from('dispatch_records')
         .update({
@@ -164,7 +268,7 @@ export function CoordinatorDashboardClient() {
       
       if (updateError) throw updateError;
       
-      // 4. Actualizar el saldo de bolsos del conductor
+      // 2. Actualizar el saldo de bolsos del conductor
       if (recordData && recordData.name) {
         const currentBalance = recordData.drivers?.bags_balance || 0;
         const { error: driverError } = await supabase
@@ -193,7 +297,7 @@ export function CoordinatorDashboardClient() {
         }
       }
       
-      // 5. Recargar la lista actualizada
+      // 3. Recargar la lista actualizada
       await loadActiveDrivers();
       
     } catch (error) {
@@ -205,6 +309,8 @@ export function CoordinatorDashboardClient() {
       });
     } finally {
       setIsLoading(false);
+      setShowBagsDialog(false);
+      setCheckoutData(null);
     }
   };
 
@@ -284,6 +390,18 @@ export function CoordinatorDashboardClient() {
           <BagsManager />
         </TabsContent>
       </Tabs>
+
+      {checkoutData && (
+        <BagsDialog
+          isOpen={showBagsDialog}
+          onClose={() => {
+            setShowBagsDialog(false);
+            setCheckoutData(null);
+          }}
+          onConfirm={handleBagsConfirmed}
+          driverName={checkoutData.driverName}
+        />
+      )}
     </div>
   );
 }
