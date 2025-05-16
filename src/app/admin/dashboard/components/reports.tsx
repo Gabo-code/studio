@@ -447,10 +447,13 @@ export function Reports() {
                 {filteredRecords.length} {filteredRecords.length === 1 ? 'registro' : 'registros'}
               </Badge>
               <Badge variant="outline" className="bg-green-50 text-green-800">
-                {filteredRecords.filter(r => r.status === 'completado' || r.end_time !== null).length} completados
+                {filteredRecords.filter(r => r.status === 'despachado').length} despachados
               </Badge>
               <Badge variant="outline" className="bg-amber-50 text-amber-800">
-                {filteredRecords.filter(r => r.status === 'pendiente' || r.end_time === null).length} pendientes
+                {filteredRecords.filter(r => r.status === 'pendiente' || r.status === 'en_cola').length} pendientes
+              </Badge>
+              <Badge variant="outline" className="bg-red-50 text-red-800">
+                {filteredRecords.filter(r => r.status === 'cancelado').length} cancelados
               </Badge>
             </div>
           </div>
@@ -509,10 +512,17 @@ export function Reports() {
                     <TableCell>
                       <Badge 
                         variant="outline" 
-                        className={record.status === 'completado' || record.end_time ? 
-                          "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}
+                        className={
+                          record.status === 'despachado' ? "bg-green-50 text-green-800" :
+                          (record.status === 'pendiente' || record.status === 'en_cola') ? "bg-amber-50 text-amber-800" :
+                          record.status === 'cancelado' ? "bg-red-50 text-red-800" :
+                          "bg-gray-100 text-gray-800"
+                        }
                       >
-                        {record.status === 'completado' || record.end_time ? 'Completado' : 'Pendiente'}
+                        {record.status === 'despachado' && 'Despachado'}
+                        {(record.status === 'pendiente' || record.status === 'en_cola') && 'Pendiente'}
+                        {record.status === 'cancelado' && 'Cancelado'}
+                        {!['despachado', 'pendiente', 'en_cola', 'cancelado'].includes(record.status) && record.status}
                       </Badge>
                     </TableCell>
                   </TableRow>
