@@ -27,7 +27,6 @@ import { Badge } from '@/components/ui/badge';
 type DriverStatus = 
   | 'en_espera'     // En la cola esperando ser despachado
   | 'en_reparto'    // Despachado por coordinador, realizando entregas
-  | 'turno_terminado' // Ha terminado su turno del día
   | 'inactivo'      // No está en servicio
   | null;           // Estado inicial
 
@@ -271,7 +270,6 @@ export function DriverManagement() {
     const statusStyles = {
       en_espera: "bg-green-100 text-green-800 hover:bg-green-200",
       en_reparto: "bg-red-100 text-red-800 hover:bg-red-200",
-      turno_terminado: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
       inactivo: "bg-gray-100 text-gray-800 hover:bg-gray-200"
     };
     
@@ -366,13 +364,7 @@ export function DriverManagement() {
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle className="text-2xl font-bold flex items-center">
-              <Users className="mr-2 h-5 w-5 text-primary" /> 
-              Master Driver List
-            </CardTitle>
-            <CardDescription>
-              Manage the list of registered drivers. Currently {drivers.length} drivers in the system.
-            </CardDescription>
+            {/* Título y descripción eliminados */}
           </div>
           <div className="flex gap-2">
             {!isAdding && !isEditing && (
@@ -412,6 +404,9 @@ export function DriverManagement() {
               </>
             )}
           </div>
+        </div>
+        <div className="text-sm text-muted-foreground mt-2">
+          Actualmente hay {drivers.length} {drivers.length === 1 ? 'conductor' : 'conductores'} en el sistema.
         </div>
       </CardHeader>
       <CardContent>
@@ -531,7 +526,6 @@ export function DriverManagement() {
                       <option value="todos">Todos</option>
                       <option value="en_espera">En Espera</option>
                       <option value="en_reparto">En Reparto</option>
-                      <option value="turno_terminado">Turno Terminado</option>
                       <option value="inactivo">Inactivo</option>
                     </select>
                   </TableCell>
