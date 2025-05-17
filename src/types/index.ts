@@ -1,6 +1,7 @@
 export interface Driver {
   id: string; // Persistent ID
   name: string;
+  vehicle_type?: string; // Type of vehicle (auto, moto, etc.)
   // Potentially add other master details like contact, vehicle, etc.
 }
 
@@ -32,7 +33,7 @@ export type FraudAlert = {
 export type DriverStatus = 
   | 'en_espera'     // En la cola esperando ser despachado
   | 'en_reparto'    // Despachado por coordinador, realizando entregas
-  | 'inactivo'      // No está en servicio (incluye fin de turno)
+  | 'inactivo'      // No está en servicio
   | null;           // Estado inicial
 
 export type DispatchStatus = 
@@ -40,3 +41,9 @@ export type DispatchStatus =
   | 'en_cola'       // Conductor anotado en la lista activa
   | 'despachado'    // Viaje completado
   | 'cancelado'     // Cancelado por admin cuando no hay más pedidos
+
+export interface DriverWithStatus extends Driver {
+  status: DriverStatus;
+  vehicle_type?: string;
+  pid?: string;
+}

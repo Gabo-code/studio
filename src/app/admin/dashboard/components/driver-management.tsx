@@ -1,40 +1,31 @@
 "use client";
 
-import { useState, useEffect, type FormEvent, useCallback } from 'react';
-import { store, subscribe } from '@/lib/store';
-import { supabase } from '@/lib/supabase';
-import type { Driver } from '@/types';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { 
-  PlusCircle, 
-  Edit2, 
-  Trash2, 
-  UserPlus, 
-  XCircle, 
-  Search, 
-  Users, 
-  RefreshCw,
-  AlertTriangle,
-  Clock
-} from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Loader2, Search, UserPlus, Edit, Trash2, Filter } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
-
-type DriverStatus = 
-  | 'en_espera'     // En la cola esperando ser despachado
-  | 'en_reparto'    // Despachado por coordinador, realizando entregas
-  | 'inactivo'      // No está en servicio
-  | null;           // Estado inicial
-
-interface DriverWithStatus extends Driver {
-  status?: DriverStatus;
-  vehicle_type?: string;
-  pid?: string | null;
-}
+import { Label } from '@/components/ui/label';
+import { DriverService } from '@/services/driver-service';
+import type { DriverWithStatus } from '@/types';
 
 export function DriverManagement() {
   const [drivers, setDrivers] = useState<DriverWithStatus[]>([]);
@@ -49,29 +40,15 @@ export function DriverManagement() {
   const [linkedFilter, setLinkedFilter] = useState('todos');
   const { toast } = useToast();
 
-  // Función para cargar los conductores directamente desde Supabase
   const loadDriversFromDb = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Obtener todos los conductores de la base de datos
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('id, name, status, vehicle_type, pid')
-        .order('name');
-      
-      if (error) throw error;
-      
-      // Actualizar tanto el store local como el estado
-      setDrivers(data || []);
-      
-      // También actualizar el store local (para mantener compatibilidad)
-      data?.forEach(driver => {
-        store.addMasterDriver({ id: driver.id, name: driver.name });
-      });
+      const data = await DriverService.getAllDrivers();
+      setDrivers(data);
       
       toast({ 
         title: "Drivers Loaded", 
-        description: `${data?.length || 0} drivers loaded from database.` 
+        description: `${data.length} drivers loaded from database.` 
       });
     } catch (err) {
       console.error('Error loading drivers:', err);
@@ -80,559 +57,368 @@ export function DriverManagement() {
         description: "Failed to load drivers from database.", 
         variant: "destructive" 
       });
-      
-      // Usar la lista local como fallback
-      refreshDrivers();
     } finally {
       setIsLoading(false);
     }
   }, [toast]);
 
-  // Función fallback para cargar desde el store local
-  const refreshDrivers = useCallback(() => {
-    setDrivers(store.getMasterDriverList());
-  }, []);
-
   useEffect(() => {
-    // Cargar conductores desde la base de datos al iniciar
     loadDriversFromDb();
-    
-    // Suscribirse a cambios en el store local como fallback
-    const unsubscribe = subscribe(refreshDrivers);
-    return () => unsubscribe();
-  }, [loadDriversFromDb, refreshDrivers]);
+  }, [loadDriversFromDb]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-        toast({ title: "Validation Error", description: "Driver name cannot be empty.", variant: "destructive"});
-        return;
+  const handleAddDriver = async () => {
+    if (!formData.name || !formData.vehicle_type) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
     }
-    
-    setIsLoading(true);
-    
-    try {
-      if (isEditing) {
-        // Actualizar conductor existente
-        const { error } = await supabase
-          .from('drivers')
-          .update({ 
-            name: formData.name,
-            vehicle_type: formData.vehicle_type || null 
-          })
-          .eq('id', isEditing.id);
-          
-        if (error) throw error;
-        
-        // También actualizar en el store local
-        store.updateMasterDriver({ ...isEditing, name: formData.name });
-        
-        toast({ title: "Driver Updated", description: `Details for ${formData.name} updated.` });
-        setIsEditing(null);
-      } else {
-        // Añadir nuevo conductor
-        if (!formData.id.trim()) {
-          toast({ title: "Validation Error", description: "Driver ID cannot be empty when adding.", variant: "destructive"});
-          return;
-        }
-        
-        // Verificar si ya existe
-        const existingDriverById = drivers.find(d => d.id === formData.id);
-        const existingDriverByName = drivers.find(d => d.name.toLowerCase() === formData.name.toLowerCase());
 
-        if (existingDriverById) {
-          toast({ title: "Error", description: `Driver with ID ${formData.id} already exists.`, variant: "destructive"});
-          return;
-        }
-        if (existingDriverByName) {
-          toast({ title: "Error", description: `Driver with name ${formData.name} already exists.`, variant: "destructive"});
-          return;
-        }
-        
-        // Insertar en la base de datos
-        const { error } = await supabase
-          .from('drivers')
-          .insert([{ 
-            id: formData.id, 
-            name: formData.name,
-            vehicle_type: formData.vehicle_type || null,
-            status: 'inactivo',
-            pid: null
-          }]);
-          
-        if (error) throw error;
-          
-        // También añadir al store local
-        store.addMasterDriver({ id: formData.id, name: formData.name });
-        
-        toast({ title: "Driver Added", description: `${formData.name} added to the master list.` });
-        setIsAdding(false);
-      }
+    setIsLoading(true);
+    try {
+      const newDriver: DriverWithStatus = {
+        id: formData.id || crypto.randomUUID(),
+        name: formData.name,
+        vehicle_type: formData.vehicle_type,
+        status: 'inactivo'
+      };
+
+      await DriverService.addDriver(newDriver);
+      
+      toast({
+        title: "Success",
+        description: "Driver added successfully."
+      });
+
+      setIsAdding(false);
+      setFormData({ id: '', name: '', vehicle_type: '' });
+      loadDriversFromDb();
     } catch (err) {
-      console.error('Error saving driver:', err);
-      toast({ 
-        title: "Error", 
-        description: "Failed to save driver to database.", 
-        variant: "destructive" 
+      console.error('Error adding driver:', err);
+      toast({
+        title: "Error",
+        description: "Failed to add driver.",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
-      setFormData({ id: '', name: '', vehicle_type: '' });
-      loadDriversFromDb(); // Recargar la lista
     }
   };
 
-  const handleEdit = (driver: DriverWithStatus) => {
-    setIsEditing(driver);
-    setFormData({ 
-      id: driver.id, 
-      name: driver.name,
-      vehicle_type: driver.vehicle_type || ''
-    });
-    setIsAdding(false); // Ensure not in adding mode
-  };
-
-  const handleDelete = async (driverId: string) => {
-    if (!window.confirm("Are you sure you want to delete this driver? This action cannot be undone.")) {
+  const handleEditDriver = async () => {
+    if (!isEditing || !formData.name || !formData.vehicle_type) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
       return;
     }
-    
+
     setIsLoading(true);
-    
     try {
-      // Eliminar de la base de datos
-      const { error } = await supabase
-        .from('drivers')
-        .delete()
-        .eq('id', driverId);
-        
-      if (error) throw error;
+      const updatedDriver: DriverWithStatus = {
+        ...isEditing,
+        name: formData.name,
+        vehicle_type: formData.vehicle_type
+      };
+
+      await DriverService.updateDriver(updatedDriver);
       
-      // También eliminar del store local
-      store.removeMasterDriver(driverId);
+      toast({
+        title: "Success",
+        description: "Driver updated successfully."
+      });
+
+      setIsEditing(null);
+      setFormData({ id: '', name: '', vehicle_type: '' });
+      loadDriversFromDb();
+    } catch (err) {
+      console.error('Error updating driver:', err);
+      toast({
+        title: "Error",
+        description: "Failed to update driver.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteDriver = async (driver: DriverWithStatus) => {
+    if (!window.confirm(`Are you sure you want to delete ${driver.name}?`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await DriverService.deleteDriver(driver.id);
       
-      toast({ title: "Driver Deleted", description: "Driver removed from the system." });
+      toast({
+        title: "Success",
+        description: "Driver deleted successfully."
+      });
+
+      loadDriversFromDb();
     } catch (err) {
       console.error('Error deleting driver:', err);
-      toast({ 
-        title: "Error", 
-        description: "Failed to delete driver. The driver may have associated records.", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "Failed to delete driver.",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
-      loadDriversFromDb(); // Recargar la lista
     }
   };
 
-  const resetFormState = () => {
-    setIsAdding(false);
-    setIsEditing(null);
-    setFormData({ id: '', name: '', vehicle_type: '' });
-  };
-  
-  // Filtrar conductores con todos los filtros
   const filteredDrivers = drivers.filter(driver => {
-    // Aplicar filtro general de búsqueda
-    const matchesSearchTerm = searchTerm ? (
-      driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (driver.vehicle_type && driver.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase()))
-    ) : true;
+    const matchesName = driver.name.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesVehicleType = vehicleTypeFilter === 'todos' || driver.vehicle_type === vehicleTypeFilter;
+    const matchesStatus = statusFilter === 'todos' || driver.status === statusFilter;
+    const matchesLinked = linkedFilter === 'todos' || 
+      (linkedFilter === 'linked' && driver.pid) || 
+      (linkedFilter === 'unlinked' && !driver.pid);
     
-    // Aplicar filtro específico de nombre
-    const matchesNameFilter = nameFilter ? 
-      driver.name.toLowerCase().includes(nameFilter.toLowerCase()) : true;
-    
-    // Aplicar filtro de tipo de vehículo
-    const matchesVehicleType = vehicleTypeFilter === 'todos' ? true :
-      (driver.vehicle_type && driver.vehicle_type.toLowerCase() === vehicleTypeFilter.toLowerCase());
-    
-    // Aplicar filtro de estado
-    const matchesStatus = statusFilter === 'todos' ? true :
-      driver.status === statusFilter;
-    
-    // Aplicar filtro de vinculación
-    const matchesLinked = linkedFilter === 'todos' ? true :
-      (linkedFilter === 'vinculado' ? !!driver.pid : !driver.pid);
-    
-    return matchesSearchTerm && matchesNameFilter && 
-           matchesVehicleType && matchesStatus && matchesLinked;
+    return matchesName && matchesVehicleType && matchesStatus && matchesLinked;
   });
-  
-  // Función para renderizar el estado del conductor
-  const renderStatusBadge = (status: DriverStatus) => {
-    if (!status) return null;
-    
-    const statusStyles = {
-      en_espera: "bg-green-100 text-green-800 hover:bg-green-200",
-      en_reparto: "bg-red-100 text-red-800 hover:bg-red-200",
-      inactivo: "bg-gray-100 text-gray-800 hover:bg-gray-200"
-    };
-    
-    return (
-      <Badge variant="outline" className={statusStyles[status]}>
-        {status}
-      </Badge>
-    );
-  };
-
-  const handleEndShift = async () => {
-    setIsLoading(true);
-    try {
-      // 1. Verificar que no haya registros en cola
-      const { data: queueRecords, error: queueError } = await supabase
-        .from('dispatch_records')
-        .select('id')
-        .eq('status', 'en_cola');
-
-      if (queueError) throw queueError;
-
-      if (queueRecords && queueRecords.length > 0) {
-        toast({
-          title: "Error",
-          description: "No se puede cerrar el turno mientras haya conductores en cola de espera.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // 2. Actualizar todos los conductores en reparto a inactivo
-      const { error: driversError } = await supabase
-        .from('drivers')
-        .update({ status: 'inactivo' })
-        .eq('status', 'en_reparto');
-
-      if (driversError) throw driversError;
-
-      toast({
-        title: "Turno finalizado",
-        description: "Se ha marcado el fin de turno para todos los conductores en reparto.",
-        variant: "default"
-      });
-
-      // Recargar la lista de conductores
-      loadDriversFromDb();
-    } catch (error) {
-      console.error('Error al finalizar turno:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo finalizar el turno. Intente nuevamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCancelQueue = async () => {
-    if (!window.confirm("¿Estás seguro de que deseas cancelar todos los despachos pendientes y en cola? Esta acción no se puede deshacer.")) {
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.rpc('cancel_pending_dispatches');
-      
-      if (error) throw error;
-
-      toast({
-        title: "Despachos cancelados",
-        description: "Se han cancelado todos los despachos pendientes y en cola. Los conductores han sido marcados como inactivos.",
-        variant: "default"
-      });
-
-      // Recargar la lista de conductores
-      loadDriversFromDb();
-    } catch (error) {
-      console.error('Error al cancelar los despachos:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cancelar los despachos. Intente nuevamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <Card className="shadow-md">
       <CardHeader>
         <div className="flex justify-between items-center">
-          <div>
-            {/* Título y descripción eliminados */}
+          <div className="flex items-center gap-2">
+            <UserPlus className="h-6 w-6 text-primary" />
+            <CardTitle>Gestión de Conductores</CardTitle>
           </div>
           <div className="flex gap-2">
-            {!isAdding && !isEditing && (
-              <>
-                <Button 
-                  onClick={loadDriversFromDb} 
-                  variant="outline" 
-                  size="sm"
-                  disabled={isLoading}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> 
-                  Refresh
-                </Button>
-                <Button 
-                  onClick={() => { setIsAdding(true); setFormData({id:'', name:'', vehicle_type:''}); }} 
-                  size="sm"
-                >
-                  <UserPlus className="mr-2 h-4 w-4" /> Add Driver
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleEndShift}
-                  disabled={isLoading}
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Finalizar Turno
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleCancelQueue}
-                  disabled={isLoading}
-                  className="bg-orange-500 text-white"
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Cancelar Cola
-                </Button>
-              </>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadDriversFromDb}
+              disabled={isLoading}
+            >
+              <Loader2 className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                setIsAdding(true);
+                setFormData({ id: '', name: '', vehicle_type: '' });
+              }}
+              disabled={isLoading}
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Nuevo Conductor
+            </Button>
           </div>
         </div>
-        <div className="text-sm text-muted-foreground mt-2">
-          Actualmente hay {drivers.length} {drivers.length === 1 ? 'conductor' : 'conductores'} en el sistema.
-        </div>
+        <CardDescription>
+          Administra los conductores registrados en el sistema
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Formulario para añadir o editar conductor */}
-        {(isAdding || isEditing) && (
-          <form onSubmit={handleSubmit} className="mb-6 p-4 border rounded-lg space-y-4 bg-muted/50">
-            <h3 className="text-lg font-semibold">{isEditing ? 'Edit Driver' : 'Add New Driver'}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="driverId">Driver ID</Label>
-                <Input 
-                  id="driverId" 
-                  name="id" 
-                  value={formData.id} 
-                  onChange={handleInputChange} 
-                  placeholder="Unique Driver ID" 
-                  required 
-                  disabled={!!isEditing} // ID is not editable for existing drivers
-                />
-                {isAdding && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Este ID debe ser único y se usará para identificar al conductor en el sistema.
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="driverName">Nombre Completo</Label>
-                <Input 
-                  id="driverName" 
-                  name="name" 
-                  value={formData.name} 
-                  onChange={handleInputChange} 
-                  placeholder="Nombre Completo" 
-                  required 
-                />
-              </div>
-              <div>
-                <Label htmlFor="vehicleType">Tipo de Vehículo</Label>
-                <Input 
-                  id="vehicleType" 
-                  name="vehicle_type" 
-                  value={formData.vehicle_type} 
-                  onChange={handleInputChange} 
-                  placeholder="Auto, Camioneta, Moto, etc." 
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Label>Buscar por Nombre</Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Nombre del conductor..."
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
                 />
               </div>
             </div>
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={resetFormState} disabled={isLoading}>
-                <XCircle className="mr-2 h-4 w-4" /> Cancelar
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                ) : isEditing ? (
-                  <Edit2 className="mr-2 h-4 w-4" />
-                ) : (
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                )}
-                {isEditing ? 'Guardar Cambios' : 'Añadir Conductor'}
-              </Button>
+            <div>
+              <Label>Tipo de Vehículo</Label>
+              <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="auto">Auto</SelectItem>
+                  <SelectItem value="moto">Moto</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </form>
-        )}
-
-        {/* Barra de búsqueda general */}
-        {!isAdding && !isEditing && (
-          <div className="relative mb-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, ID o tipo de vehículo..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+            <div>
+              <Label>Estado</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Seleccionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="inactivo">Inactivo</SelectItem>
+                  <SelectItem value="en_espera">En Espera</SelectItem>
+                  <SelectItem value="en_reparto">En Reparto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Vinculación</Label>
+              <Select value={linkedFilter} onValueChange={setLinkedFilter}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Estado de vinculación" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="linked">Vinculados</SelectItem>
+                  <SelectItem value="unlinked">No Vinculados</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        )}
 
-        {/* Tabla de conductores con filtros específicos por columna */}
-        {!isAdding && !isEditing && (
-          <div className="border rounded-md">
+          {/* Drivers Table */}
+          {isLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Cargando conductores...</p>
+            </div>
+          ) : filteredDrivers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No se encontraron conductores que coincidan con los filtros.
+            </div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
-                  <TableHead>Tipo de Vehículo</TableHead>
+                  <TableHead>Vehículo</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Vinculado</TableHead>
+                  <TableHead>ID Persistente</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-                <TableRow className="bg-muted/40">
-                  <TableCell>
-                    <Input 
-                      placeholder="Buscar nombre..."
-                      value={nameFilter}
-                      onChange={(e) => setNameFilter(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <select 
-                      value={vehicleTypeFilter}
-                      onChange={(e) => setVehicleTypeFilter(e.target.value)}
-                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
-                    >
-                      <option value="todos">Todos</option>
-                      <option value="auto">Auto</option>
-                      <option value="moto">Moto</option>
-                    </select>
-                  </TableCell>
-                  <TableCell>
-                    <select 
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
-                    >
-                      <option value="todos">Todos</option>
-                      <option value="en_espera">En Espera</option>
-                      <option value="en_reparto">En Reparto</option>
-                      <option value="inactivo">Inactivo</option>
-                    </select>
-                  </TableCell>
-                  <TableCell>
-                    <select 
-                      value={linkedFilter}
-                      onChange={(e) => setLinkedFilter(e.target.value)}
-                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
-                    >
-                      <option value="todos">Todos</option>
-                      <option value="vinculado">Vinculado</option>
-                      <option value="no vinculado">No vinculado</option>
-                    </select>
-                  </TableCell>
-                  <TableCell></TableCell>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-                      <span className="text-muted-foreground">Cargando conductores...</span>
+                {filteredDrivers.map((driver) => (
+                  <TableRow key={driver.id}>
+                    <TableCell>{driver.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {driver.vehicle_type === 'auto' ? 'Auto' : 'Moto'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={
+                        driver.status === 'en_reparto' ? 'bg-green-100 text-green-800' :
+                        driver.status === 'en_espera' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }>
+                        {driver.status === 'en_reparto' ? 'En Reparto' :
+                         driver.status === 'en_espera' ? 'En Espera' :
+                         'Inactivo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {driver.pid || '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setIsEditing(driver);
+                            setFormData({
+                              id: driver.id,
+                              name: driver.name,
+                              vehicle_type: driver.vehicle_type || ''
+                            });
+                          }}
+                          title="Editar conductor"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleDeleteDriver(driver)}
+                          title="Eliminar conductor"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredDrivers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      {searchTerm || nameFilter || vehicleTypeFilter !== 'todos' || 
-                       statusFilter !== 'todos' || linkedFilter !== 'todos' ? (
-                        <span className="text-muted-foreground">No se encontraron conductores con los filtros aplicados</span>
-                      ) : (
-                        <span className="text-muted-foreground">No hay conductores registrados</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredDrivers.map((driver) => (
-                    <TableRow key={driver.id}>
-                      <TableCell className="font-medium">{driver.name}</TableCell>
-                      <TableCell>{driver.vehicle_type || "-"}</TableCell>
-                      <TableCell>{renderStatusBadge(driver.status || null)}</TableCell>
-                      <TableCell>
-                        {driver.pid ? (
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
-                            Vinculado
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-gray-100 text-gray-500">
-                            No vinculado
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            onClick={() => handleEdit(driver)} 
-                            title="Editar conductor"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="icon" 
-                            onClick={() => handleDelete(driver.id)} 
-                            title="Eliminar conductor"
-                            disabled={!!driver.pid}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
-      {!isAdding && !isEditing && (
-        <CardFooter className="flex justify-between border-t p-4">
-          <div className="text-sm text-muted-foreground">
-            {filteredDrivers.length} {filteredDrivers.length === 1 ? 'conductor' : 'conductores'} 
-            {(searchTerm || nameFilter || vehicleTypeFilter !== 'todos' || 
-              statusFilter !== 'todos' || linkedFilter !== 'todos') && " encontrados con filtros aplicados"}
+
+      {/* Add/Edit Driver Dialog */}
+      <Dialog open={isAdding || isEditing !== null} onOpenChange={(open) => {
+        if (!open) {
+          setIsAdding(false);
+          setIsEditing(null);
+          setFormData({ id: '', name: '', vehicle_type: '' });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditing ? 'Editar Conductor' : 'Nuevo Conductor'}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? 'Modifica los datos del conductor' : 'Ingresa los datos del nuevo conductor'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nombre</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Nombre del conductor"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-type">Tipo de Vehículo</Label>
+              <Select
+                value={formData.vehicle_type}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, vehicle_type: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo de vehículo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto</SelectItem>
+                  <SelectItem value="moto">Moto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          {(searchTerm || nameFilter || vehicleTypeFilter !== 'todos' || 
-            statusFilter !== 'todos' || linkedFilter !== 'todos') && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+          <DialogFooter>
+            <Button
+              variant="outline"
               onClick={() => {
-                setSearchTerm('');
-                setNameFilter('');
-                setVehicleTypeFilter('todos');
-                setStatusFilter('todos');
-                setLinkedFilter('todos');
+                setIsAdding(false);
+                setIsEditing(null);
+                setFormData({ id: '', name: '', vehicle_type: '' });
               }}
             >
-              Limpiar filtros
+              Cancelar
             </Button>
-          )}
-        </CardFooter>
-      )}
+            <Button
+              onClick={isEditing ? handleEditDriver : handleAddDriver}
+              disabled={isLoading}
+            >
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? 'Guardar Cambios' : 'Agregar Conductor'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

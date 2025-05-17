@@ -18,6 +18,8 @@ import dynamic from 'next/dynamic';
 import { SelfieCapture } from './selfie-capture';
 import { usePersistentId } from '@/hooks/use-persistent-id';
 import { generateSelfieFilePath, getSelfieBucket } from '@/lib/storage';
+import { DriverService } from '@/services/driver-service';
+import type { Driver } from '@/types';
 
 // Dynamically import LocationMap as it uses Leaflet which is client-side only
 const LocationMap = dynamic(() => import('./location-map').then(mod => mod.LocationMap), {
@@ -93,7 +95,7 @@ export function CheckInForm(): React.JSX.Element {
   const [showSelfieCapture, setShowSelfieCapture] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isNameLocked, setIsNameLocked] = useState(false);
-  const [drivers, setDrivers] = useState<{id: string, name: string, vehicle_type: string}[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
   const [open, setOpen] = useState(false);
   const [vehicleType, setVehicleType] = useState<string | null>(null);
@@ -330,66 +332,19 @@ export function CheckInForm(): React.JSX.Element {
     setFormError(null);
     
     try {
-      // Obtener conductor por nombre (sin filtrar por dispatch_records.status)
-      const { data: driverData, error: driverError } = await supabase
-        .from('drivers')
-        .select(`
-          id,
-          status,
-          bags_balance,
-          vehicle_type,
-          dispatch_records(id, status)
-        `)
-        .eq('name', name)
-        .maybeSingle();
+      // Obtener el estado del conductor y validar
+      const driverStatus = await DriverService.checkDriverStatus(name);
 
-      if (driverError) {
-        throw new Error('Error al verificar el estado del conductor');
-      }
-
-      if (!driverData) {
-        throw new Error(`No se encontró el conductor con nombre ${name}`);
-      }
-
-      // Validaciones de estado
-      // Revisar si tiene algún registro de despacho en_cola
-      const enCola = driverData.dispatch_records && driverData.dispatch_records.some((r: any) => r.status === 'en_cola');
-      if (enCola || driverData.status === 'en_espera') {
-        throw new Error('Ya estás en la cola de espera. Espera a que el coordinador te asigne un viaje.');
-      }
-
-      if (driverData.status === 'en_reparto') {
-        throw new Error('No puedes registrarte mientras estás en reparto. Completa tu viaje actual primero.');
-      }
-
-      if (driverData.bags_balance > 0) {
-        throw new Error(`Tienes ${driverData.bags_balance} bolso${driverData.bags_balance === 1 ? '' : 's'} pendiente${driverData.bags_balance === 1 ? '' : 's'} por devolver.`);
-      }
-
-      // Crear el registro de despacho y actualizar estado en una sola operación
-      const dispatchRecord = {
-        id: uuidv4(),
-        driver_id: driverData.id,
-        name: name,
+      // Realizar el check-in
+      await DriverService.checkIn({
+        driverId: driverStatus.id,
+        name,
         pid: persistentId,
-        start_time: new Date().toISOString(),
-        startlatitude: currentLocation?.latitude,
-        startlongitude: currentLocation?.longitude,
-        status: 'en_cola',
-        selfie_url: selfieStorageUrl,
-        bags_taken: 0
-      };
-
-      // Usar una transacción para garantizar atomicidad
-      const { error: transactionError } = await supabase.rpc('check_in_driver', {
-        p_driver_name: name,
-        p_persistent_id: persistentId,
-        p_dispatch_data: dispatchRecord
+        startTime: new Date().toISOString(),
+        startLatitude: currentLocation?.latitude,
+        startLongitude: currentLocation?.longitude,
+        selfieUrl: selfieStorageUrl
       });
-
-      if (transactionError) {
-        throw new Error('Error al registrar en la cola. Es posible que ya estés en espera o en reparto.');
-      }
 
       // Éxito - redirigir al portal de espera
       router.push('/waiting');

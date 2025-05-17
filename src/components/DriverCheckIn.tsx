@@ -1,46 +1,30 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { DriverService } from '@/services/driver-service';
+import type { Driver, DriverStatus } from '@/types';
 
-interface Driver {
-  id: string;
+interface CheckInData {
+  driverId: string;
   name: string;
-  vehicle_id: string;
-  status: string;
+  pid: string;
+  startTime: string;
+  startLatitude?: number;
+  startLongitude?: number;
+  selfieUrl: string;
 }
 
-export default function DriverCheckIn() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+export function DriverCheckIn() {
+  const [name, setName] = useState('');
+  const [pid, setPid] = useState('');
+  const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  // Cargar la lista de conductores disponibles
   useEffect(() => {
-    async function loadDrivers() {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('*')
-        .order('name');
-      
-      if (error) {
-        console.error('Error cargando conductores:', error);
-      } else if (data) {
-        setDrivers(data);
-      }
-    }
-    
-    loadDrivers();
-  }, []);
-
-  // Obtener la ubicación actual
-  useEffect(() => {
+    // Get current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -50,162 +34,141 @@ export default function DriverCheckIn() {
           });
         },
         (error) => {
-          console.error('Error obteniendo ubicación:', error);
+          console.error('Error getting location:', error);
+          setError('No se pudo obtener tu ubicación. Por favor habilita el acceso a la ubicación.');
         }
       );
+    } else {
+      setError('Tu navegador no soporta geolocalización.');
     }
   }, []);
 
-  // Filtrar conductores basado en el término de búsqueda
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredDrivers([]);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!name.trim()) {
+      setError('Por favor ingresa tu nombre');
       return;
     }
-    
-    const filtered = drivers.filter(driver => 
-      driver.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredDrivers(filtered);
-  }, [searchTerm, drivers]);
 
-  // Manejar selección de conductor
-  const handleSelectDriver = (driver: Driver) => {
-    setSelectedDriver(driver);
-    setSearchTerm(driver.name);
-    setShowDropdown(false);
-  };
+    if (!pid.trim()) {
+      setError('Por favor ingresa tu ID');
+      return;
+    }
 
-  // Registrar asistencia
-  const handleCheckIn = async () => {
-    if (!selectedDriver) {
-      setMessage('Por favor seleccione un conductor');
+    if (!selfieDataUrl) {
+      setError('Por favor toma una selfie');
       return;
     }
 
     if (!location) {
-      setMessage('Esperando ubicación GPS...');
+      setError('Esperando tu ubicación...');
       return;
     }
 
     setIsLoading(true);
-    setMessage('');
 
     try {
-      // Crear registro en dispatch_records
-      const dispatchRecord = {
-        id: uuidv4(),
-        driver_id: selectedDriver.id,
-        start_time: new Date().toISOString(),
-        startlatitude: location.latitude,
-        startlongitude: location.longitude,
-        status: 'en_curso'
+      const checkInData: CheckInData = {
+        driverId: uuidv4(),
+        name: name.trim(),
+        pid: pid.trim(),
+        startTime: new Date().toISOString(),
+        startLatitude: location.latitude,
+        startLongitude: location.longitude,
+        selfieUrl: selfieDataUrl
       };
 
-      const { error } = await supabase
-        .from('dispatch_records')
-        .insert([dispatchRecord]);
+      await DriverService.checkIn(checkInData);
 
-      if (error) throw error;
-
-      // Actualizar status del conductor a 'ocupado'
-      await supabase
-        .from('drivers')
-        .update({ status: 'ocupado' })
-        .eq('id', selectedDriver.id);
-
-      setMessage(`¡Asistencia registrada para ${selectedDriver.name}!`);
-      setSelectedDriver(null);
-      setSearchTerm('');
-    } catch (error) {
-      console.error('Error registrando asistencia:', error);
-      setMessage('Error al registrar asistencia');
+      // Clear form
+      setName('');
+      setPid('');
+      setSelfieDataUrl(null);
+      setError(null);
+    } catch (err) {
+      console.error('Error during check-in:', err);
+      setError(err instanceof Error ? err.message : 'Error durante el check-in');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleCaptureSelfie = () => {
+    // TODO: Implement selfie capture
+    setSelfieDataUrl('data:image/jpeg;base64,...');
+  };
+
   return (
-    <div className="w-full max-w-md mx-auto p-4">
-      <h2 className="text-xl font-bold mb-4">Registro de Asistencia</h2>
+    <div className="max-w-md mx-auto p-6">
+      <h2 className="text-2xl font-bold mb-6">Check-In de Conductor</h2>
       
-      <div className="relative">
-        <input
-          type="text"
-          className="w-full p-2 border rounded mb-2"
-          placeholder="Buscar conductor..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setShowDropdown(true);
-          }}
-          onFocus={() => setShowDropdown(true)}
-        />
-        
-        {showDropdown && filteredDrivers.length > 0 && (
-          <ul className="absolute z-10 w-full bg-white border rounded shadow-lg">
-            {filteredDrivers.map((driver) => (
-              <li 
-                key={driver.id}
-                className={`p-2 cursor-pointer hover:bg-gray-100 ${driver.status !== 'disponible' ? 'text-gray-400' : ''}`}
-                onClick={() => handleSelectDriver(driver)}
-              >
-                <div className="flex justify-between">
-                  <span>{driver.name}</span>
-                  <span className={`text-sm ${
-                    driver.status === 'disponible' ? 'text-green-500' : 
-                    driver.status === 'ocupado' ? 'text-red-500' : 
-                    driver.status === 'descanso' ? 'text-yellow-500' : 'text-gray-500'
-                  }`}>
-                    {driver.status}
-                  </span>
-                </div>
-                {driver.vehicle_id && <div className="text-xs text-gray-500">Vehículo: {driver.vehicle_id}</div>}
-              </li>
-            ))}
-          </ul>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            Nombre
+          </label>
+          <input
+            type="text"
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            placeholder="Tu nombre completo"
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="pid" className="block text-sm font-medium text-gray-700">
+            ID Persistente
+          </label>
+          <input
+            type="text"
+            id="pid"
+            value={pid}
+            onChange={(e) => setPid(e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            placeholder="Tu ID único"
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <button
+            type="button"
+            onClick={handleCaptureSelfie}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={isLoading}
+          >
+            Tomar Selfie
+          </button>
+          {selfieDataUrl && (
+            <div className="mt-2">
+              <img src={selfieDataUrl} alt="Selfie" className="w-32 h-32 object-cover rounded-lg" />
+            </div>
+          )}
+        </div>
+
+        {location && (
+          <div className="text-sm text-gray-500">
+            Ubicación: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+          </div>
         )}
-      </div>
-      
-      {selectedDriver && (
-        <div className="mt-4 p-3 border rounded bg-gray-50">
-          <h3 className="font-bold">{selectedDriver.name}</h3>
-          <p className="text-sm">Vehículo: {selectedDriver.vehicle_id}</p>
-          <p className="text-sm">Estado: {selectedDriver.status}</p>
-        </div>
-      )}
-      
-      {location && (
-        <div className="mt-2 text-xs text-gray-500">
-          GPS: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-        </div>
-      )}
-      
-      <button
-        onClick={handleCheckIn}
-        disabled={!selectedDriver || isLoading || selectedDriver?.status !== 'disponible'}
-        className={`mt-4 w-full py-2 rounded ${
-          !selectedDriver || isLoading || selectedDriver?.status !== 'disponible'
-            ? 'bg-gray-300 cursor-not-allowed'
-            : 'bg-blue-600 hover:bg-blue-700 text-white'
-        }`}
-      >
-        {isLoading ? 'Registrando...' : 'Registrar Asistencia'}
-      </button>
-      
-      {message && (
-        <div className={`mt-4 p-2 rounded ${
-          message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-        }`}>
-          {message}
-        </div>
-      )}
-      
-      <div className="mt-4">
-        <p className="text-sm text-gray-500">
-          Nota: Solo se pueden registrar conductores con estado "disponible".
-        </p>
-      </div>
+
+        {error && (
+          <div className="text-red-600 text-sm">{error}</div>
+        )}
+
+        <button
+          type="submit"
+          className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Procesando...' : 'Check-In'}
+        </button>
+      </form>
     </div>
   );
 } 
