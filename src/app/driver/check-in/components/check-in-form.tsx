@@ -149,26 +149,55 @@ export function CheckInForm(): React.JSX.Element {
   async function loadDrivers(isAssociated: boolean) {
     try {
       setIsLoadingDrivers(true);
-      let query = supabase
+      
+      // Construir la query base
+      const query = supabase
         .from('drivers')
-        .select('id, name, vehicle_type')
+        .select('id, name, vehicle_type, pid');
+
+      // Si hay un persistentId, buscar conductores sin pid O con el pid actual
+      if (persistentId) {
+        const { data, error } = await query
+          .or(`pid.is.null,pid.eq.${persistentId}`)
+          .order('name');
+          
+        if (error) throw error;
         
-      // Si el usuario no está asociado, cargar solo conductores sin pid
-      if (!isAssociated) {
-        query = query.is('pid', null);
-      }
-      
-      const { data, error } = await query.order('name');
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (data) {
-        setDrivers(data);
+        if (data) {
+          // Ordenar: primero el conductor asociado, luego por nombre
+          const sortedDrivers = data.sort((a, b) => {
+            if (a.pid === persistentId) return -1;
+            if (b.pid === persistentId) return 1;
+            return a.name.localeCompare(b.name);
+          });
+          
+          setDrivers(sortedDrivers);
+          
+          // Debug: mostrar cuántos conductores se encontraron
+          console.log(`Encontrados ${data.length} conductores:`, {
+            conPid: data.filter(d => d.pid === persistentId).length,
+            sinPid: data.filter(d => d.pid === null).length
+          });
+        }
+      } else {
+        // Si no hay persistentId, solo mostrar conductores sin pid
+        const { data, error } = await query
+          .is('pid', null)
+          .order('name');
+          
+        if (error) throw error;
+        setDrivers(data || []);
+        
+        // Debug: mostrar cuántos conductores sin pid se encontraron
+        console.log(`Encontrados ${data?.length || 0} conductores sin pid`);
       }
     } catch (err) {
       console.error('Error cargando conductores:', err);
+      toast({
+        title: "Error",
+        description: "Error al cargar la lista de conductores",
+        variant: "destructive"
+      });
     } finally {
       setIsLoadingDrivers(false);
     }
@@ -310,14 +339,14 @@ export function CheckInForm(): React.JSX.Element {
   };
 
   const handleDriverSelect = (driverName: string) => {
-    setName(driverName);
-    setOpen(false);
-    
-    // Obtener el tipo de vehículo del conductor seleccionado
     const selectedDriver = drivers.find(d => d.name === driverName);
     if (selectedDriver) {
-      setVehicleType(selectedDriver.vehicle_type);
+      setName(selectedDriver.name);
+      // vehicle_type is optional, so we explicitly set it to null if undefined
+      const vehicleType = typeof selectedDriver.vehicle_type === 'string' ? selectedDriver.vehicle_type : null;
+      setVehicleType(vehicleType);
     }
+    setOpen(false);
   };
 
   const handleCheckIn = async (e: FormEvent) => {
@@ -406,7 +435,9 @@ export function CheckInForm(): React.JSX.Element {
             </div>
           ) : drivers.length === 0 && !hasAssociatedPid ? (
             <div className="p-3 border rounded-md bg-amber-50 text-amber-800 text-sm">
-              No hay conductores disponibles para seleccionar. Todos los conductores ya están asociados a dispositivos.
+              {persistentId 
+                ? "No hay conductores disponibles para seleccionar. Esto puede significar que todos los conductores ya están asociados a otros dispositivos, o que no hay conductores registrados en el sistema."
+                : "No se pudo generar un ID para este dispositivo. Por favor, intenta recargar la página o contacta a soporte técnico."}
             </div>
           ) : (
             <Popover open={open} onOpenChange={setOpen}>
