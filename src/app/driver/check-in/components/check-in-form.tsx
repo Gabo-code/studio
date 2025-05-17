@@ -330,7 +330,7 @@ export function CheckInForm(): React.JSX.Element {
     setFormError(null);
     
     try {
-      // Una sola consulta para obtener toda la información necesaria
+      // Obtener conductor por nombre (sin filtrar por dispatch_records.status)
       const { data: driverData, error: driverError } = await supabase
         .from('drivers')
         .select(`
@@ -338,10 +338,9 @@ export function CheckInForm(): React.JSX.Element {
           status,
           bags_balance,
           vehicle_type,
-          dispatch_records!inner(id)
+          dispatch_records(id, status)
         `)
         .eq('name', name)
-        .eq('dispatch_records.status', 'en_cola')
         .maybeSingle();
 
       if (driverError) {
@@ -353,11 +352,9 @@ export function CheckInForm(): React.JSX.Element {
       }
 
       // Validaciones de estado
-      if (driverData.dispatch_records && driverData.dispatch_records.length > 0) {
-        throw new Error('Ya estás en la cola de espera. Espera a que el coordinador te asigne un viaje.');
-      }
-
-      if (driverData.status === 'en_espera') {
+      // Revisar si tiene algún registro de despacho en_cola
+      const enCola = driverData.dispatch_records && driverData.dispatch_records.some((r: any) => r.status === 'en_cola');
+      if (enCola || driverData.status === 'en_espera') {
         throw new Error('Ya estás en la cola de espera. Espera a que el coordinador te asigne un viaje.');
       }
 
