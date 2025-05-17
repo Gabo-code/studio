@@ -73,7 +73,7 @@ export function Reports() {
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [filterType, setFilterType] = useState<'day' | 'week'>('day');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'despachado' | 'pendiente' | 'cancelado'>('all');
 
   // Cargar registros desde Supabase
   const loadDispatchRecords = useCallback(async () => {
@@ -103,7 +103,7 @@ export function Reports() {
   }, [filterType, startDate, endDate, statusFilter]);
 
   // Aplicar filtros a los registros
-  const applyFilters = useCallback((records: DispatchRecord[], type: 'day' | 'week', start?: Date, end?: Date, status: 'all' | 'completed' | 'pending' = 'all') => {
+  const applyFilters = useCallback((records: DispatchRecord[], type: 'day' | 'week', start?: Date, end?: Date, status: 'all' | 'despachado' | 'pendiente' | 'cancelado' = 'all') => {
     if (!records.length || !start) {
       setFilteredRecords([]);
       return;
@@ -153,13 +153,12 @@ export function Reports() {
 
     // Aplicar filtro por estado
     let result = filteredByDate;
-    if (status === 'completed') {
+    if (status === 'despachado') {
       result = filteredByDate.filter(record => record.status === 'despachado');
-    } else if (status === 'pending') {
-      result = filteredByDate.filter(record => 
-        record.status === 'pendiente' || 
-        record.status === 'en_cola'
-      );
+    } else if (status === 'pendiente') {
+      result = filteredByDate.filter(record => record.status === 'pendiente' || record.status === 'en_cola');
+    } else if (status === 'cancelado') {
+      result = filteredByDate.filter(record => record.status === 'cancelado');
     }
 
     setFilteredRecords(result);
@@ -199,7 +198,7 @@ export function Reports() {
     }
   };
 
-  const handleStatusFilterChange = (status: 'all' | 'completed' | 'pending') => {
+  const handleStatusFilterChange = (status: 'all' | 'despachado' | 'pendiente' | 'cancelado') => {
     setStatusFilter(status);
     applyFilters(dispatchRecords, filterType, startDate, endDate, status);
   };
@@ -248,7 +247,7 @@ export function Reports() {
 
     // Añadir filtro de estado al nombre
     if (statusFilter !== 'all') {
-      fileName += `_${statusFilter === 'completed' ? 'despachados' : 'pendientes'}`;
+      fileName += `_${statusFilter === 'despachado' ? 'despachados' : statusFilter === 'pendiente' ? 'pendientes' : 'cancelados'}`;
     }
 
     if (format === 'csv') {
@@ -391,14 +390,15 @@ export function Reports() {
             
             <div className="w-full md:w-auto">
               <Label htmlFor="status-filter" className="block mb-2">Estado</Label>
-              <Select value={statusFilter} onValueChange={(value) => handleStatusFilterChange(value as 'all' | 'completed' | 'pending')}>
+              <Select value={statusFilter} onValueChange={(value) => handleStatusFilterChange(value as 'all' | 'despachado' | 'pendiente' | 'cancelado')}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="completed">Completados</SelectItem>
-                  <SelectItem value="pending">Pendientes</SelectItem>
+                  <SelectItem value="despachado">Despachados</SelectItem>
+                  <SelectItem value="pendiente">Pendientes</SelectItem>
+                  <SelectItem value="cancelado">Cancelados</SelectItem>
                 </SelectContent>
               </Select>
             </div>
