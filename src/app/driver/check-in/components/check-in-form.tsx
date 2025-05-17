@@ -150,6 +150,22 @@ export function CheckInForm(): React.JSX.Element {
     try {
       setIsLoadingDrivers(true);
       
+      // Debug: Verificar conexión a la base de datos
+      console.log('Intentando cargar conductores...');
+      console.log('PID actual:', persistentId);
+      
+      // Primero, intentar obtener todos los conductores para verificar acceso
+      const { data: allDrivers, error: countError } = await supabase
+        .from('drivers')
+        .select('id');
+        
+      if (countError) {
+        console.error('Error accediendo a la tabla drivers:', countError);
+        throw countError;
+      }
+      
+      console.log(`Total de conductores en la base de datos: ${allDrivers?.length || 0}`);
+      
       // Construir la query base
       const query = supabase
         .from('drivers')
@@ -157,13 +173,20 @@ export function CheckInForm(): React.JSX.Element {
 
       // Si hay un persistentId, buscar conductores sin pid O con el pid actual
       if (persistentId) {
+        console.log('Buscando conductores sin pid o con pid:', persistentId);
         const { data, error } = await query
           .or(`pid.is.null,pid.eq.${persistentId}`)
           .order('name');
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error en la consulta OR:', error);
+          throw error;
+        }
         
         if (data) {
+          // Debug: Mostrar datos encontrados
+          console.log('Datos de conductores encontrados:', data);
+          
           // Ordenar: primero el conductor asociado, luego por nombre
           const sortedDrivers = data.sort((a, b) => {
             if (a.pid === persistentId) return -1;
@@ -174,29 +197,44 @@ export function CheckInForm(): React.JSX.Element {
           setDrivers(sortedDrivers);
           
           // Debug: mostrar cuántos conductores se encontraron
-          console.log(`Encontrados ${data.length} conductores:`, {
-            conPid: data.filter(d => d.pid === persistentId).length,
-            sinPid: data.filter(d => d.pid === null).length
+          console.log('Análisis de conductores encontrados:', {
+            total: data.length,
+            conPidActual: data.filter(d => d.pid === persistentId).length,
+            sinPid: data.filter(d => d.pid === null).length,
+            otrosPid: data.filter(d => d.pid !== null && d.pid !== persistentId).length
           });
         }
       } else {
-        // Si no hay persistentId, solo mostrar conductores sin pid
+        console.log('No hay persistentId, buscando solo conductores sin pid');
         const { data, error } = await query
           .is('pid', null)
           .order('name');
           
-        if (error) throw error;
-        setDrivers(data || []);
+        if (error) {
+          console.error('Error en la consulta IS NULL:', error);
+          throw error;
+        }
         
-        // Debug: mostrar cuántos conductores sin pid se encontraron
-        console.log(`Encontrados ${data?.length || 0} conductores sin pid`);
+        if (data) {
+          console.log('Conductores sin pid encontrados:', data);
+        }
+        
+        setDrivers(data || []);
       }
     } catch (err) {
-      console.error('Error cargando conductores:', err);
+      console.error('Error detallado al cargar conductores:', err);
+      // Mostrar más detalles del error en el toast
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : typeof err === 'object' && err !== null
+          ? JSON.stringify(err)
+          : 'Error desconocido';
+          
       toast({
-        title: "Error",
-        description: "Error al cargar la lista de conductores",
-        variant: "destructive"
+        title: "Error de acceso a la base de datos",
+        description: `No se pudo cargar la lista de conductores: ${errorMessage}`,
+        variant: "destructive",
+        duration: 5000
       });
     } finally {
       setIsLoadingDrivers(false);
