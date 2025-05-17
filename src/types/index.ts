@@ -34,13 +34,15 @@ export type DriverStatus =
   | 'en_espera'     // En la cola esperando ser despachado
   | 'en_reparto'    // Despachado por coordinador, realizando entregas
   | 'inactivo'      // No está en servicio
-  | null;           // Estado inicial
+  | null;           // Estado inicial o no definido
 
-export type DispatchStatus = 
-  | 'pendiente'     // Admin lo agregó pero coord no inicia la cola
-  | 'en_cola'       // Conductor anotado en la lista activa
-  | 'despachado'    // Viaje completado
-  | 'cancelado'     // Cancelado por admin cuando no hay más pedidos
+export type DispatchStatus =
+  | 'pendiente'     // Acaba de hacer check-in, esperando entrar a la cola
+  | 'en_fila'       // En la cola de espera
+  | 'en_curso'      // Despachado y en ruta
+  | 'salida_OK'     // Completó el despacho exitosamente
+  | 'cancelado'     // Canceló o abandonó el despacho
+  | null;           // Estado inicial o no definido
 
 export interface DriverWithStatus extends Driver {
   status: DriverStatus;

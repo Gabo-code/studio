@@ -30,14 +30,14 @@ export class DriverService {
     bagsBalance: number;
     currentDispatch?: { id: string; status: DispatchStatus };
   }> {
-    // Obtener el estado actual del conductor
+    // Obtener el estado actual del conductor y sus despachos activos
     const { data: driver, error } = await supabase
       .from('drivers')
       .select(`
         id,
         status,
         bags_balance,
-        dispatch_records (
+        dispatch_records!inner (
           id,
           status
         )
@@ -50,8 +50,13 @@ export class DriverService {
 
     // Verificar si tiene un despacho activo
     const currentDispatch = driver.dispatch_records?.find(
-      (r: any) => r.status === 'en_cola' || r.status === 'pendiente'
+      (r: any) => ['pendiente', 'en_fila'].includes(r.status)
     );
+
+    // Validar estado del conductor
+    if (driver.status === 'en_espera' || driver.status === 'en_reparto') {
+      throw new Error('No puedes hacer check-in mientras estés en espera o en reparto');
+    }
 
     return {
       id: driver.id,
@@ -76,19 +81,42 @@ export class DriverService {
     if (transactionError) throw transactionError;
 
     try {
-      // 1. Update driver status to en_espera
+      // 1. Verificar que el conductor esté inactivo
+      const { data: driverCheck, error: checkError } = await supabase
+        .from('drivers')
+        .select('status, pid')
+        .eq('id', data.driverId)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+      if (!driverCheck) throw new Error('Conductor no encontrado');
+
+      // Validar estado
+      if (driverCheck.status !== 'inactivo') {
+        throw new Error(`No puedes hacer check-in en estado ${driverCheck.status}`);
+      }
+
+      // Validar PID si ya existe
+      if (driverCheck.pid && driverCheck.pid !== data.pid) {
+        throw new Error('Este conductor ya está asociado a otro dispositivo');
+      }
+
+      // 2. Update driver status and pid
       const { error: driverError } = await supabase
         .from('drivers')
-        .update({ status: 'en_espera' })
+        .update({ 
+          status: 'en_espera',
+          pid: data.pid // Asociar el dispositivo al conductor
+        })
         .eq('id', data.driverId);
 
       if (driverError) throw driverError;
 
-      // 2. Create dispatch record
+      // 3. Create dispatch record
       const { error: dispatchError } = await supabase
         .from('dispatch_records')
         .insert([{
-          id: data.driverId,
+          driver_id: data.driverId,
           name: data.name,
           start_time: data.startTime,
           startlatitude: data.startLatitude,
