@@ -358,6 +358,10 @@ export function CheckInForm(): React.JSX.Element {
         throw new Error('Ya estás en la cola de espera. Espera a que el coordinador te asigne un viaje.');
       }
 
+      if (driverData.status === 'en_reparto') {
+        throw new Error('No puedes registrarte mientras estás en reparto. Completa tu viaje actual primero.');
+      }
+
       if (driverData.bags_balance > 0) {
         throw new Error(`Tienes ${driverData.bags_balance} bolso${driverData.bags_balance === 1 ? '' : 's'} pendiente${driverData.bags_balance === 1 ? '' : 's'} por devolver.`);
       }
