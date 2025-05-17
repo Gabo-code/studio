@@ -157,13 +157,15 @@ export function CheckInForm(): React.JSX.Element {
       // Construir la query base
       const query = supabase
         .from('drivers')
-        .select('id, name, vehicle_type, pid');
+        .select('id, name, vehicle_type, pid, status');
 
-      // Si hay un persistentId, buscar conductores sin pid O con el pid actual
+      // Si hay un persistentId, buscar:
+      // 1. Conductores inactivos sin pid
+      // 2. O el conductor con el pid actual (sin importar su estado)
       if (persistentId) {
-        console.log('Buscando conductores sin pid o con pid:', persistentId);
+        console.log('Buscando conductores disponibles o con pid:', persistentId);
         const { data, error } = await query
-          .or('pid.is.null,pid.eq.' + persistentId)
+          .or(`and(status.eq.inactivo,pid.is.null),pid.eq.${persistentId}`)
           .order('name');
           
         if (error) {
@@ -189,22 +191,26 @@ export function CheckInForm(): React.JSX.Element {
             total: data.length,
             conPidActual: data.filter(d => d.pid === persistentId).length,
             sinPid: data.filter(d => d.pid === null).length,
-            otrosPid: data.filter(d => d.pid !== null && d.pid !== persistentId).length
+            otrosPid: data.filter(d => d.pid !== null && d.pid !== persistentId).length,
+            inactivos: data.filter(d => d.status === 'inactivo').length,
+            enEspera: data.filter(d => d.status === 'en_espera').length,
+            enReparto: data.filter(d => d.status === 'en_reparto').length
           });
         }
       } else {
-        console.log('No hay persistentId, buscando solo conductores sin pid');
+        console.log('No hay persistentId, buscando solo conductores inactivos sin pid');
         const { data, error } = await query
+          .eq('status', 'inactivo')
           .is('pid', null)
           .order('name');
           
         if (error) {
-          console.error('Error en la consulta IS NULL:', error);
+          console.error('Error en la consulta:', error);
           throw error;
         }
         
         if (data) {
-          console.log('Conductores sin pid encontrados:', data);
+          console.log('Conductores inactivos sin pid encontrados:', data);
           setDrivers(data);
         } else {
           setDrivers([]);
