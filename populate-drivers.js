@@ -1,88 +1,126 @@
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuidv4 } = require('uuid');
 
-// Configuración de Supabase
-const supabaseUrl = 'https://tzjiovkpwkpqckfswfmf.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6amlvdmtwd2twcWNrZnN3Zm1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxODgxMjIsImV4cCI6MjA2Mjc2NDEyMn0.l6ktBaHuP8CEV3mwSaRLh2JU9Xw_Xl3RK93qEG8dKGQ';
+// Configuración de Supabase (usando service_role key en lugar de anon key)
+const supabaseUrl = "https://tzjiovkpwkpqckfswfmf.supabase.co";
+const supabaseServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6amlvdmtwd2twcWNrZnN3Zm1mIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzE4ODEyMiwiZXhwIjoyMDYyNzY0MTIyfQ.zjR6Odq71l5wOM9dJ1vEJJK6lCEsfZAVF8PU8KSKLAo";
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Crear cliente con permisos de servicio
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
-// Lista de nombres y apellidos en español
-const nombres = [
-  'Juan', 'Carlos', 'Miguel', 'José', 'Antonio', 'Francisco', 'Luis', 'Javier',
-  'Manuel', 'Rafael', 'Pedro', 'Fernando', 'David', 'Alberto', 'Santiago',
-  'María', 'Ana', 'Carmen', 'Laura', 'Isabel', 'Patricia', 'Elena', 'Cristina'
+// Lista de conductores de prueba
+const conductores = [
+  {
+    name: 'Juan Pérez',
+    vehicle_type: 'auto',
+    status: 'inactivo',
+    bags_balance: 0,
+    pid: null
+  },
+  {
+    name: 'María González',
+    vehicle_type: 'auto',
+    status: 'inactivo',
+    bags_balance: 0,
+    pid: null
+  },
+  {
+    name: 'Carlos Rodríguez',
+    vehicle_type: 'moto',
+    status: 'inactivo',
+    bags_balance: 0,
+    pid: null
+  },
+  {
+    name: 'Ana Martínez',
+    vehicle_type: 'auto',
+    status: 'inactivo',
+    bags_balance: 0,
+    pid: null
+  },
+  {
+    name: 'Luis Torres',
+    vehicle_type: 'moto',
+    status: 'inactivo',
+    bags_balance: 0,
+    pid: null
+  }
 ];
 
-const apellidos = [
-  'García', 'Rodríguez', 'González', 'Fernández', 'López', 'Martínez', 'Sánchez', 
-  'Pérez', 'Gómez', 'Martín', 'Jiménez', 'Ruiz', 'Hernández', 'Díaz', 'Álvarez',
-  'Torres', 'Vázquez', 'Serrano', 'Moreno', 'Muñoz', 'Alonso', 'Romero', 'Ortega'
-];
-
-// Estados posibles para los conductores
-const estados = ['disponible', 'ocupado', 'descanso', 'fuera de servicio'];
-
-// Función para generar un nombre completo aleatorio
-function generarNombre() {
-  const nombre = nombres[Math.floor(Math.random() * nombres.length)];
-  const apellido1 = apellidos[Math.floor(Math.random() * apellidos.length)];
-  const apellido2 = apellidos[Math.floor(Math.random() * apellidos.length)];
-  
-  return `${nombre} ${apellido1} ${apellido2}`;
-}
-
-// Función para generar un ID de vehículo aleatorio
-function generarVehiculoId() {
-  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const letra1 = letras[Math.floor(Math.random() * letras.length)];
-  const letra2 = letras[Math.floor(Math.random() * letras.length)];
-  const numeros = Math.floor(1000 + Math.random() * 9000); // 4 dígitos
-  
-  return `${letra1}${letra2}-${numeros}`;
-}
-
-// Función para generar un estado aleatorio
-function generarEstado() {
-  return estados[Math.floor(Math.random() * estados.length)];
-}
-
-// Función para generar los conductores e insertarlos
-async function poblarTablaDrivers(cantidad = 20) {
-  console.log(`Generando ${cantidad} conductores aleatorios...`);
-  
-  const conductores = [];
-  
-  for (let i = 0; i < cantidad; i++) {
-    const conductor = {
-      id: uuidv4(),
-      name: generarNombre(),
-      vehicle_id: generarVehiculoId(),
-      status: generarEstado()
-    };
+async function poblarConductores() {
+  try {
+    console.log('Conectando a Supabase con permisos de servicio...');
     
-    conductores.push(conductor);
-  }
-  
-  console.log('Insertando conductores en la base de datos...');
-  const { data, error } = await supabase
-    .from('drivers')
-    .insert(conductores);
+    // Primero, verificar conexión
+    const { data: testData, error: testError } = await supabase
+      .from('drivers')
+      .select('count');
+      
+    if (testError) {
+      console.error('Error de conexión:', testError);
+      return;
+    }
     
-  if (error) {
-    console.error('Error al insertar los conductores:', error);
-    return false;
+    console.log('Conexión exitosa a Supabase');
+    
+    // Verificar si ya hay conductores
+    const { data: existingDrivers, error: countError } = await supabase
+      .from('drivers')
+      .select('id');
+
+    if (countError) {
+      throw countError;
+    }
+
+    if (existingDrivers && existingDrivers.length > 0) {
+      console.log(`Ya existen ${existingDrivers.length} conductores en la base de datos.`);
+      console.log('¿Deseas continuar y agregar más conductores? (Ctrl+C para cancelar)');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 segundos para cancelar
+    }
+
+    // Insertar los conductores
+    console.log('Iniciando inserción de conductores...');
+    
+    for (const conductor of conductores) {
+      const { error } = await supabase
+        .from('drivers')
+        .insert([{
+          id: uuidv4(), // Generar UUID único para cada conductor
+          ...conductor
+        }]);
+
+      if (error) {
+        console.error(`Error al insertar conductor ${conductor.name}:`, error);
+      } else {
+        console.log(`✓ Conductor agregado: ${conductor.name} (${conductor.vehicle_type})`);
+      }
+    }
+
+    console.log('\nProceso completado.');
+    
+    // Verificar conductores finales
+    const { data: finalDrivers, error: finalError } = await supabase
+      .from('drivers')
+      .select('name, vehicle_type, status')
+      .order('name');
+      
+    if (!finalError && finalDrivers) {
+      console.log('\nConductores en la base de datos:');
+      finalDrivers.forEach((d, i) => {
+        console.log(`${i + 1}. ${d.name} (${d.vehicle_type}) - ${d.status}`);
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error durante la población de datos:', error);
   }
-  
-  console.log(`¡${cantidad} conductores insertados con éxito!`);
-  console.log('Conductores generados:');
-  conductores.forEach((conductor, index) => {
-    console.log(`${index + 1}. ${conductor.name} (${conductor.vehicle_id}) - ${conductor.status}`);
-  });
-  
-  return true;
 }
 
-// Ejecutar la función
-poblarTablaDrivers()
-  .catch(console.error); 
+// Ejecutar el script
+console.log('Iniciando script de población de conductores...\n');
+poblarConductores(); // Solo una vez 

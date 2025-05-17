@@ -154,18 +154,6 @@ export function CheckInForm(): React.JSX.Element {
       console.log('Intentando cargar conductores...');
       console.log('PID actual:', persistentId);
       
-      // Primero, intentar obtener todos los conductores para verificar acceso
-      const { data: allDrivers, error: countError } = await supabase
-        .from('drivers')
-        .select('id');
-        
-      if (countError) {
-        console.error('Error accediendo a la tabla drivers:', countError);
-        throw countError;
-      }
-      
-      console.log(`Total de conductores en la base de datos: ${allDrivers?.length || 0}`);
-      
       // Construir la query base
       const query = supabase
         .from('drivers')
@@ -175,7 +163,7 @@ export function CheckInForm(): React.JSX.Element {
       if (persistentId) {
         console.log('Buscando conductores sin pid o con pid:', persistentId);
         const { data, error } = await query
-          .or(`pid.is.null,pid.eq.${persistentId}`)
+          .or('pid.is.null,pid.eq.' + persistentId)
           .order('name');
           
         if (error) {
@@ -217,9 +205,10 @@ export function CheckInForm(): React.JSX.Element {
         
         if (data) {
           console.log('Conductores sin pid encontrados:', data);
+          setDrivers(data);
+        } else {
+          setDrivers([]);
         }
-        
-        setDrivers(data || []);
       }
     } catch (err) {
       console.error('Error detallado al cargar conductores:', err);
