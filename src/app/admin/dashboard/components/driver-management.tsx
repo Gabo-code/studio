@@ -101,13 +101,12 @@ export function DriverManagement() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (name === 'ssl') {
-      const numValue = value === '' ? 0 : parseInt(value);
-      if (!isNaN(numValue)) {
-        setFormData(prev => ({
-          ...prev,
-          [name]: numValue
-        }));
-      }
+      // Convertir el valor a número y asegurarse de que sea 0 o positivo
+      const numValue = Math.max(0, parseInt(value) || 0);
+      setFormData(prev => ({
+        ...prev,
+        [name]: numValue
+      }));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -119,27 +118,35 @@ export function DriverManagement() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-        toast({ title: "Validation Error", description: "Driver name cannot be empty.", variant: "destructive"});
-        return;
+      toast({ title: "Validation Error", description: "Driver name cannot be empty.", variant: "destructive"});
+      return;
     }
     
     setIsLoading(true);
     
     try {
       if (isEditing) {
+        // Asegurarse de que ssl sea un número
+        const sslValue = typeof formData.ssl === 'number' ? formData.ssl : 0;
+        
         // Actualizar conductor existente
         const updateData = {
           name: formData.name,
           vehicle_type: formData.vehicle_type || null,
-          ssl: formData.ssl
+          ssl: sslValue
         };
+
+        console.log('Updating driver with data:', updateData); // Para debugging
 
         const { error } = await supabase
           .from('drivers')
           .update(updateData)
           .eq('id', isEditing.id);
           
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase update error:', error); // Para debugging
+          throw error;
+        }
         
         // También actualizar en el store local
         store.updateMasterDriver({ ...isEditing, name: formData.name });
@@ -208,9 +215,9 @@ export function DriverManagement() {
       id: driver.id, 
       name: driver.name,
       vehicle_type: driver.vehicle_type || '',
-      ssl: driver.ssl || 0
+      ssl: typeof driver.ssl === 'number' ? driver.ssl : 0
     });
-    setIsAdding(false); // Ensure not in adding mode
+    setIsAdding(false);
   };
 
   const handleDelete = async (driverId: string) => {
