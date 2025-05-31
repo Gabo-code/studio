@@ -122,7 +122,12 @@ export function DriverQueue({
                       {index + 1}
                     </div>
                     <div className="flex-grow min-w-0">
-                      <h3 className="text-base sm:text-lg font-semibold truncate">{driver.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-semibold truncate">{driver.name}</h3>
+                        <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                          SSL={driver.ssl || 0}
+                        </Badge>
+                      </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
                         {driver.vehicle_type && (
                           <span className="flex items-center text-xs sm:text-sm bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">

@@ -100,10 +100,20 @@ export function DriverManagement() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'ssl' ? parseInt(value) || 0 : value
-    }));
+    if (name === 'ssl') {
+      const numValue = value === '' ? 0 : parseInt(value);
+      if (!isNaN(numValue)) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: numValue
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -118,13 +128,15 @@ export function DriverManagement() {
     try {
       if (isEditing) {
         // Actualizar conductor existente
+        const updateData = {
+          name: formData.name,
+          vehicle_type: formData.vehicle_type || null,
+          ssl: formData.ssl
+        };
+
         const { error } = await supabase
           .from('drivers')
-          .update({ 
-            name: formData.name,
-            vehicle_type: formData.vehicle_type || null,
-            ssl: parseInt(formData.ssl.toString()) || 0
-          })
+          .update(updateData)
           .eq('id', isEditing.id);
           
         if (error) throw error;
@@ -155,16 +167,18 @@ export function DriverManagement() {
         }
         
         // Insertar en la base de datos
+        const insertData = {
+          id: formData.id,
+          name: formData.name,
+          vehicle_type: formData.vehicle_type || null,
+          status: 'disponible',
+          pid: null,
+          ssl: formData.ssl
+        };
+
         const { error } = await supabase
           .from('drivers')
-          .insert([{ 
-            id: formData.id, 
-            name: formData.name,
-            vehicle_type: formData.vehicle_type || null,
-            status: 'disponible',
-            pid: null,
-            ssl: parseInt(formData.ssl.toString()) || 0
-          }]);
+          .insert([insertData]);
           
         if (error) throw error;
           
