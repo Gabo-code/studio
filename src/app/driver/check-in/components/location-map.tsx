@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
 });
 
 
-import { getCurrentPosition, isWithinJumboRadius, type Coordinates } from '@/lib/geolocation';
+import { getCurrentPosition, isWithinSLRRadius, type Coordinates } from '@/lib/geolocation';
 import { JUMBO_LATITUDE, JUMBO_LONGITUDE, MAX_DISTANCE_METERS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -139,7 +139,7 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
       setUserLocation(leafletCoords);
       onLocationUpdate(coords);
 
-      const withinRadius = isWithinJumboRadius(coords);
+      const withinRadius = isWithinSLRRadius(coords);
       onLocationVerified(withinRadius);
       setStatus('success');
       if (withinRadius) {
@@ -191,10 +191,10 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
       </Button>
       {errorMsg && <p className="text-sm text-destructive">{errorMsg}</p>}
       
-      {status === 'success' && userLocation && !isWithinJumboRadius({ latitude: (userLocation as [number, number])[0], longitude: (userLocation as [number, number])[1] }) && (
+      {status === 'success' && userLocation && !isWithinSLRRadius({ latitude: (userLocation as [number, number])[0], longitude: (userLocation as [number, number])[1] }) && (
         <p className="text-sm text-destructive font-medium">Actualmente estás fuera del radio de 50m para el check-in.</p>
       )}
-      {status === 'success' && userLocation && isWithinJumboRadius({ latitude: (userLocation as [number, number])[0], longitude: (userLocation as [number, number])[1] }) && (
+      {status === 'success' && userLocation && isWithinSLRRadius({ latitude: (userLocation as [number, number])[0], longitude: (userLocation as [number, number])[1] }) && (
         <p className="text-sm text-green-600 font-medium">Ubicación verificada. Estás dentro del rango.</p>
       )}
       {status === 'success' && !userLocation && (
