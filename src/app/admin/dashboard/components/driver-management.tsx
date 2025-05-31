@@ -99,7 +99,11 @@ export function DriverManagement() {
   }, [loadDriversFromDb, refreshDrivers]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'ssl' ? parseInt(value) || 0 : value
+    }));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -119,7 +123,7 @@ export function DriverManagement() {
           .update({ 
             name: formData.name,
             vehicle_type: formData.vehicle_type || null,
-            ssl: formData.ssl
+            ssl: parseInt(formData.ssl.toString()) || 0
           })
           .eq('id', isEditing.id);
           
@@ -159,7 +163,7 @@ export function DriverManagement() {
             vehicle_type: formData.vehicle_type || null,
             status: 'disponible',
             pid: null,
-            ssl: formData.ssl
+            ssl: parseInt(formData.ssl.toString()) || 0
           }]);
           
         if (error) throw error;
