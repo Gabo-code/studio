@@ -131,27 +131,71 @@ export function DriverManagement() {
         
         // Actualizar conductor existente
         const updateData = {
-          name: formData.name,
-          vehicle_type: formData.vehicle_type || null,
+          name: formData.name.trim(),
+          vehicle_type: formData.vehicle_type?.trim() || null,
           ssl: sslValue
         };
 
-        console.log('Updating driver with data:', updateData); // Para debugging
+        console.log('Updating driver with data:', updateData);
+        console.log('Driver ID:', isEditing.id);
 
-        const { error } = await supabase
+        // Primero verificar si el conductor existe
+        const { data: existingDriver, error: checkError } = await supabase
           .from('drivers')
-          .update(updateData)
+          .select('id, ssl')
+          .eq('id', isEditing.id)
+          .single();
+
+        if (checkError) {
+          console.error('Error checking driver:', checkError);
+          throw checkError;
+        }
+
+        if (!existingDriver) {
+          throw new Error('Driver not found');
+        }
+
+        // Realizar la actualización
+        const { error: updateError } = await supabase
+          .from('drivers')
+          .update({
+            name: updateData.name,
+            vehicle_type: updateData.vehicle_type,
+            ssl: updateData.ssl
+          })
           .eq('id', isEditing.id);
           
-        if (error) {
-          console.error('Supabase update error:', error); // Para debugging
-          throw error;
+        if (updateError) {
+          console.error('Supabase update error:', updateError);
+          throw updateError;
         }
+
+        // Verificar que la actualización fue exitosa
+        const { data: updatedDriver, error: verifyError } = await supabase
+          .from('drivers')
+          .select('id, name, vehicle_type, ssl')
+          .eq('id', isEditing.id)
+          .single();
+
+        if (verifyError) {
+          console.error('Error verifying update:', verifyError);
+          throw verifyError;
+        }
+
+        console.log('Updated driver data:', updatedDriver);
         
         // También actualizar en el store local
-        store.updateMasterDriver({ ...isEditing, name: formData.name });
+        store.updateMasterDriver({ 
+          ...isEditing, 
+          name: updateData.name,
+          vehicle_type: updateData.vehicle_type,
+          ssl: updateData.ssl
+        });
         
-        toast({ title: "Driver Updated", description: `Details for ${formData.name} updated.` });
+        toast({ 
+          title: "Driver Updated", 
+          description: `Details for ${updateData.name} updated. SSL: ${updateData.ssl}` 
+        });
         setIsEditing(null);
       } else {
         // Añadir nuevo conductor
@@ -199,7 +243,7 @@ export function DriverManagement() {
       console.error('Error saving driver:', err);
       toast({ 
         title: "Error", 
-        description: "Failed to save driver to database.", 
+        description: `Failed to save driver to database: ${err.message}`, 
         variant: "destructive" 
       });
     } finally {
