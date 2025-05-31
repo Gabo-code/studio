@@ -227,11 +227,11 @@ export function CoordinatorDashboardClient() {
     }
   }, [isFormOpen]);
 
-  // Cargar datos al inicio y refrescar cada 5 minutos
+  // Cargar datos al inicio y refrescar cada 30 segundos
   useEffect(() => {
     loadActiveDrivers();
     
-    const interval = setInterval(loadActiveDrivers, 300000);
+    const interval = setInterval(loadActiveDrivers, 30000);
     return () => clearInterval(interval);
   }, [loadActiveDrivers]);
 
