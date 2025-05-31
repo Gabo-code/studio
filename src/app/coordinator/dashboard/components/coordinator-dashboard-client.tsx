@@ -127,9 +127,13 @@ export function CoordinatorDashboardClient() {
     recordData: any;
     driverName: string;
   } | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   // Cargar conductores activos desde Supabase
   const loadActiveDrivers = useCallback(async () => {
+    // No cargar si hay un formulario abierto
+    if (isFormOpen) return;
+    
     setIsLoading(true);
     try {
       // Primero obtenemos los registros activos
@@ -188,13 +192,13 @@ export function CoordinatorDashboardClient() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isFormOpen]);
 
-  // Cargar datos al inicio y refrescar cada 30 segundos
+  // Cargar datos al inicio y refrescar cada 5 minutos
   useEffect(() => {
     loadActiveDrivers();
     
-    const interval = setInterval(loadActiveDrivers, 30000);
+    const interval = setInterval(loadActiveDrivers, 300000);
     return () => clearInterval(interval);
   }, [loadActiveDrivers]);
 
@@ -213,6 +217,7 @@ export function CoordinatorDashboardClient() {
   // Manejar la marcación de salida de un conductor
   const handleCheckoutDriver = async (recordId: string) => {
     setIsLoading(true);
+    setIsFormOpen(true); // Indicar que se abrió un formulario
     try {
       // Extender la sesión solo cuando se marca la salida de un conductor
       if (isAuthenticated && role === 'coordinator') {
@@ -245,6 +250,7 @@ export function CoordinatorDashboardClient() {
         variant: "destructive"
       });
       setIsLoading(false);
+      setIsFormOpen(false); // Cerrar el indicador de formulario en caso de error
     }
   };
 
@@ -311,6 +317,7 @@ export function CoordinatorDashboardClient() {
       setIsLoading(false);
       setShowBagsDialog(false);
       setCheckoutData(null);
+      setIsFormOpen(false); // Indicar que se cerró el formulario
     }
   };
 
@@ -397,6 +404,7 @@ export function CoordinatorDashboardClient() {
           onClose={() => {
             setShowBagsDialog(false);
             setCheckoutData(null);
+            setIsFormOpen(false); // Indicar que se cerró el formulario
           }}
           onConfirm={handleBagsConfirmed}
           driverName={checkoutData.driverName}
