@@ -36,16 +36,26 @@ interface DriverRecord {
 interface BagsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (amount: number) => void;
+  onConfirm: (amount: number, sectors: string[]) => void;
   driverName: string;
 }
 
 function BagsDialog({ isOpen, onClose, onConfirm, driverName }: BagsDialogProps) {
   const [amount, setAmount] = useState(0);
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
 
   const handleConfirm = () => {
-    onConfirm(amount);
-    setAmount(0); // Reset para la próxima vez
+    onConfirm(amount, selectedSectors);
+    setAmount(0);
+    setSelectedSectors([]);
+  };
+
+  const toggleSector = (sector: string) => {
+    setSelectedSectors(prev => 
+      prev.includes(sector)
+        ? prev.filter(s => s !== sector)
+        : [...prev, sector]
+    );
   };
 
   const incrementAmount = () => setAmount(prev => prev + 1);
@@ -54,7 +64,8 @@ function BagsDialog({ isOpen, onClose, onConfirm, driverName }: BagsDialogProps)
   return (
     <Dialog open={isOpen} onOpenChange={() => {
       onClose();
-      setAmount(0); // Reset al cerrar
+      setAmount(0);
+      setSelectedSectors([]);
     }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -63,47 +74,69 @@ function BagsDialog({ isOpen, onClose, onConfirm, driverName }: BagsDialogProps)
             Entrega de Bolsos
           </DialogTitle>
           <DialogDescription>
-            Ingresa la cantidad de bolsos que se llevan para {driverName}
+            Ingresa la cantidad de bolsos y sectores para {driverName}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex items-center justify-center gap-4 py-6">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={decrementAmount}
-            disabled={amount === 0}
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <div className="flex-1 max-w-[100px]">
-            <Input
-              type="number"
-              value={amount}
-              onChange={(e) => {
-                const value = parseInt(e.target.value);
-                if (!isNaN(value) && value >= 0) {
-                  setAmount(value);
-                }
-              }}
-              className="text-center text-lg"
-              min="0"
-            />
+        <div className="space-y-6">
+          <div className="flex items-center justify-center gap-4 py-6">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={decrementAmount}
+              disabled={amount === 0}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 max-w-[100px]">
+              <Input
+                type="number"
+                value={amount}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  if (!isNaN(value) && value >= 0) {
+                    setAmount(value);
+                  }
+                }}
+                className="text-center text-lg"
+                min="0"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={incrementAmount}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={incrementAmount}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Sectores</label>
+            <div className="flex flex-wrap gap-2">
+              {['C3', 'VA', 'Otro'].map((sector) => (
+                <Button
+                  key={sector}
+                  type="button"
+                  variant={selectedSectors.includes(sector) ? "default" : "outline"}
+                  onClick={() => toggleSector(sector)}
+                  className="flex-1 min-w-[80px]"
+                >
+                  {sector}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
         <DialogFooter className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={amount < 0}>
+          <Button 
+            onClick={handleConfirm} 
+            disabled={amount < 0 || selectedSectors.length === 0}
+          >
             Confirmar
           </Button>
         </DialogFooter>
@@ -255,20 +288,21 @@ export function CoordinatorDashboardClient() {
   };
 
   // Nueva función para procesar la confirmación de bolsos
-  const handleBagsConfirmed = async (bagsCount: number) => {
+  const handleBagsConfirmed = async (bagsCount: number, sectors: string[]) => {
     if (!checkoutData) return;
     
     setIsLoading(true);
     try {
       const { recordId, recordData } = checkoutData;
 
-      // 1. Actualizar el registro de despacho con los bolsos entregados
+      // 1. Actualizar el registro de despacho con los bolsos entregados y sectores
       const { error: updateError } = await supabase
         .from('dispatch_records')
         .update({
           end_time: new Date().toISOString(),
           status: 'completado',
-          bags_taken: bagsCount
+          bags_taken: bagsCount,
+          sectores: sectors
         })
         .eq('id', recordId);
       
@@ -287,17 +321,17 @@ export function CoordinatorDashboardClient() {
         
         if (driverError) throw driverError;
 
-        // Mostrar mensaje de éxito con información de bolsos
+        // Mostrar mensaje de éxito con información de bolsos y sectores
         if (bagsCount > 0) {
           toast({
             title: "Salida registrada",
-            description: `Se han entregado ${bagsCount} bolso${bagsCount === 1 ? '' : 's'}. Saldo actual: ${currentBalance + bagsCount} bolso${currentBalance + bagsCount === 1 ? '' : 's'}.`,
+            description: `Se han entregado ${bagsCount} bolso${bagsCount === 1 ? '' : 's'} para los sectores: ${sectors.join(', ')}. Saldo actual: ${currentBalance + bagsCount} bolso${currentBalance + bagsCount === 1 ? '' : 's'}.`,
             variant: "default"
           });
         } else {
           toast({
             title: "Salida registrada",
-            description: "No se entregaron bolsos en este despacho.",
+            description: `No se entregaron bolsos. Sectores registrados: ${sectors.join(', ')}.`,
             variant: "default"
           });
         }
@@ -317,7 +351,7 @@ export function CoordinatorDashboardClient() {
       setIsLoading(false);
       setShowBagsDialog(false);
       setCheckoutData(null);
-      setIsFormOpen(false); // Indicar que se cerró el formulario
+      setIsFormOpen(false);
     }
   };
 
