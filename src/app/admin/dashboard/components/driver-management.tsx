@@ -29,13 +29,14 @@ interface DriverWithStatus extends Driver {
   status?: DriverStatus;
   vehicle_type?: string;
   pid?: string | null;
+  ssl?: number;
 }
 
 export function DriverManagement() {
   const [drivers, setDrivers] = useState<DriverWithStatus[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState<DriverWithStatus | null>(null);
-  const [formData, setFormData] = useState({ id: '', name: '', vehicle_type: '' });
+  const [formData, setFormData] = useState({ id: '', name: '', vehicle_type: '', ssl: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [nameFilter, setNameFilter] = useState('');
@@ -51,7 +52,7 @@ export function DriverManagement() {
       // Obtener todos los conductores de la base de datos
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, name, status, vehicle_type, pid')
+        .select('id, name, status, vehicle_type, pid, ssl')
         .order('name');
       
       if (error) throw error;
@@ -117,7 +118,8 @@ export function DriverManagement() {
           .from('drivers')
           .update({ 
             name: formData.name,
-            vehicle_type: formData.vehicle_type || null 
+            vehicle_type: formData.vehicle_type || null,
+            ssl: formData.ssl
           })
           .eq('id', isEditing.id);
           
@@ -156,7 +158,8 @@ export function DriverManagement() {
             name: formData.name,
             vehicle_type: formData.vehicle_type || null,
             status: 'disponible',
-            pid: null
+            pid: null,
+            ssl: formData.ssl
           }]);
           
         if (error) throw error;
@@ -176,7 +179,7 @@ export function DriverManagement() {
       });
     } finally {
       setIsLoading(false);
-      setFormData({ id: '', name: '', vehicle_type: '' });
+      setFormData({ id: '', name: '', vehicle_type: '', ssl: 0 });
       loadDriversFromDb(); // Recargar la lista
     }
   };
@@ -186,7 +189,8 @@ export function DriverManagement() {
     setFormData({ 
       id: driver.id, 
       name: driver.name,
-      vehicle_type: driver.vehicle_type || ''
+      vehicle_type: driver.vehicle_type || '',
+      ssl: driver.ssl || 0
     });
     setIsAdding(false); // Ensure not in adding mode
   };
@@ -227,7 +231,7 @@ export function DriverManagement() {
   const resetFormState = () => {
     setIsAdding(false);
     setIsEditing(null);
-    setFormData({ id: '', name: '', vehicle_type: '' });
+    setFormData({ id: '', name: '', vehicle_type: '', ssl: 0 });
   };
   
   // Filtrar conductores con todos los filtros
@@ -327,7 +331,7 @@ export function DriverManagement() {
                   onChange={handleInputChange} 
                   placeholder="Unique Driver ID" 
                   required 
-                  disabled={!!isEditing} // ID is not editable for existing drivers
+                  disabled={!!isEditing}
                 />
                 {isAdding && (
                   <p className="text-xs text-muted-foreground mt-1">
@@ -354,6 +358,18 @@ export function DriverManagement() {
                   value={formData.vehicle_type} 
                   onChange={handleInputChange} 
                   placeholder="Auto, Camioneta, Moto, etc." 
+                />
+              </div>
+              <div>
+                <Label htmlFor="ssl">Saldo SSL</Label>
+                <Input 
+                  id="ssl" 
+                  name="ssl" 
+                  type="number"
+                  min="0"
+                  value={formData.ssl} 
+                  onChange={handleInputChange} 
+                  placeholder="0" 
                 />
               </div>
             </div>
@@ -398,6 +414,7 @@ export function DriverManagement() {
                   <TableHead>Tipo de Vehículo</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Vinculado</TableHead>
+                  <TableHead>SSL</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
                 <TableRow className="bg-muted/40">
@@ -448,14 +465,14 @@ export function DriverManagement() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
                       <span className="text-muted-foreground">Cargando conductores...</span>
                     </TableCell>
                   </TableRow>
                 ) : filteredDrivers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       {searchTerm || nameFilter || vehicleTypeFilter !== 'todos' || 
                        statusFilter !== 'todos' || linkedFilter !== 'todos' ? (
                         <span className="text-muted-foreground">No se encontraron conductores con los filtros aplicados</span>
@@ -480,6 +497,11 @@ export function DriverManagement() {
                             No vinculado
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                          {driver.ssl || 0}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

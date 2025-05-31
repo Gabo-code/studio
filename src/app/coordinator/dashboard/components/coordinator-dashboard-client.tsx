@@ -36,18 +36,20 @@ interface DriverRecord {
 interface BagsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (amount: number, sectors: string[]) => void;
+  onConfirm: (amount: number, sectors: string[], useSSL: boolean) => void;
   driverName: string;
 }
 
 function BagsDialog({ isOpen, onClose, onConfirm, driverName }: BagsDialogProps) {
   const [amount, setAmount] = useState(0);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
+  const [useSSL, setUseSSL] = useState(false);
 
   const handleConfirm = () => {
-    onConfirm(amount, selectedSectors);
+    onConfirm(amount, selectedSectors, useSSL);
     setAmount(0);
     setSelectedSectors([]);
+    setUseSSL(false);
   };
 
   const toggleSector = (sector: string) => {
@@ -66,6 +68,7 @@ function BagsDialog({ isOpen, onClose, onConfirm, driverName }: BagsDialogProps)
       onClose();
       setAmount(0);
       setSelectedSectors([]);
+      setUseSSL(false);
     }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -126,6 +129,28 @@ function BagsDialog({ isOpen, onClose, onConfirm, driverName }: BagsDialogProps)
                   {sector}
                 </Button>
               ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">¿Usar SSL?</label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={useSSL ? "default" : "outline"}
+                onClick={() => setUseSSL(true)}
+                className="flex-1"
+              >
+                Sí
+              </Button>
+              <Button
+                type="button"
+                variant={!useSSL ? "default" : "outline"}
+                onClick={() => setUseSSL(false)}
+                className="flex-1"
+              >
+                No
+              </Button>
             </div>
           </div>
         </div>
@@ -288,7 +313,7 @@ export function CoordinatorDashboardClient() {
   };
 
   // Nueva función para procesar la confirmación de bolsos
-  const handleBagsConfirmed = async (bagsCount: number, sectors: string[]) => {
+  const handleBagsConfirmed = async (bagsCount: number, sectors: string[], useSSL: boolean) => {
     if (!checkoutData) return;
     
     setIsLoading(true);
@@ -302,39 +327,48 @@ export function CoordinatorDashboardClient() {
           end_time: new Date().toISOString(),
           status: 'completado',
           bags_taken: bagsCount,
-          sectores: sectors
+          sectores: sectors,
+          used_ssl: useSSL
         })
         .eq('id', recordId);
       
       if (updateError) throw updateError;
       
-      // 2. Actualizar el saldo de bolsos del conductor
+      // 2. Actualizar el saldo de bolsos del conductor y SSL si corresponde
       if (recordData && recordData.name) {
         const currentBalance = recordData.drivers?.bags_balance || 0;
+        const currentSSL = recordData.drivers?.ssl || 0;
+        
+        const updateData: any = { 
+          status: 'disponible',
+          bags_balance: currentBalance + bagsCount
+        };
+
+        // Si se usó SSL, descontar una unidad
+        if (useSSL && currentSSL > 0) {
+          updateData.ssl = currentSSL - 1;
+        }
+
         const { error: driverError } = await supabase
           .from('drivers')
-          .update({ 
-            status: 'disponible',
-            bags_balance: currentBalance + bagsCount
-          })
+          .update(updateData)
           .eq('name', recordData.name);
         
         if (driverError) throw driverError;
 
-        // Mostrar mensaje de éxito con información de bolsos y sectores
-        if (bagsCount > 0) {
-          toast({
-            title: "Salida registrada",
-            description: `Se han entregado ${bagsCount} bolso${bagsCount === 1 ? '' : 's'} para los sectores: ${sectors.join(', ')}. Saldo actual: ${currentBalance + bagsCount} bolso${currentBalance + bagsCount === 1 ? '' : 's'}.`,
-            variant: "default"
-          });
-        } else {
-          toast({
-            title: "Salida registrada",
-            description: `No se entregaron bolsos. Sectores registrados: ${sectors.join(', ')}.`,
-            variant: "default"
-          });
+        // Mostrar mensaje de éxito con información de bolsos, sectores y SSL
+        let description = `Se han entregado ${bagsCount} bolso${bagsCount === 1 ? '' : 's'} para los sectores: ${sectors.join(', ')}. `;
+        description += `Saldo actual: ${currentBalance + bagsCount} bolso${currentBalance + bagsCount === 1 ? '' : 's'}. `;
+        
+        if (useSSL) {
+          description += `Se ha descontado 1 SSL. Saldo SSL actual: ${currentSSL - 1}.`;
         }
+
+        toast({
+          title: "Salida registrada",
+          description: description,
+          variant: "default"
+        });
       }
       
       // 3. Recargar la lista actualizada
