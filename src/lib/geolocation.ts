@@ -42,7 +42,7 @@ function calculateDistance(coord1: Coordinates, coord2: Coordinates): number {
   return R * c; // Distance in meters
 }
 
-export function isWithinJumboRadius(userCoords: Coordinates): boolean {
+export function isWithinSLRRadius(userCoords: Coordinates): boolean {
   const jumboCoords: Coordinates = {
     latitude: JUMBO_LATITUDE,
     longitude: JUMBO_LONGITUDE,

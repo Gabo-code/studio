@@ -593,7 +593,7 @@ export function CheckInForm(): React.JSX.Element {
         <div className="space-y-2">
           <Label className="text-lg font-medium flex items-center"><MapPin className="mr-2 h-5 w-5 text-primary" />Verificación de Ubicación</Label>
           <LocationMap onLocationVerified={setIsLocationVerified} onLocationUpdate={setCurrentLocation} />
-          {!isLocationVerified && <p className="text-sm text-muted-foreground">Asegúrate de estar dentro de 50 metros de la tienda Jumbo. El mapa indicará el estado.</p>}
+          {!isLocationVerified && <p className="text-sm text-muted-foreground">Asegúrate de estar dentro de 50 metros de la tienda SLR. El mapa indicará el estado.</p>}
         </div>
         
         <div className="space-y-2">

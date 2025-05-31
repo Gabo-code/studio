@@ -29,7 +29,7 @@ export default function HomePage() {
       <header className="mb-12 text-center">
         <AppLogo className="mx-auto mb-4 h-16 w-auto" />
         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-          Seguimiento de Despachos Jumbo
+          Seguimiento de Despachos SLR
         </h1>
         <p className="mt-4 text-lg text-muted-foreground">
           Gestiona eficientemente el check-in y los despachos de conductores.
@@ -103,7 +103,7 @@ export default function HomePage() {
       </div>
 
       <footer className="mt-16 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} Jumbo Dispatch. Todos los derechos reservados.</p>
+        <p>&copy; {new Date().getFullYear()} SLR Dispatch. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

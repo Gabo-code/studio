@@ -3,7 +3,7 @@ import { AdminDashboardClient } from './components/admin-dashboard-client';
 import { UserCog } from 'lucide-react';
 
 export const metadata = {
-  title: 'Admin Dashboard | Jumbo Dispatch Tracker',
+  title: 'Admin Dashboard | SLR Dispatch Tracker',
 };
 
 export default function AdminDashboardPage() {

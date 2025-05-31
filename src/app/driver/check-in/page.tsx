@@ -4,7 +4,7 @@ import { Truck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export const metadata = {
-  title: 'Check-in de Conductor | Seguimiento de Despachos Jumbo',
+  title: 'Check-in de Conductor | Seguimiento de Despachos SLR',
 };
 
 // Note: Leaflet map and selfie capture require client components.

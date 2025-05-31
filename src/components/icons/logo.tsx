@@ -7,7 +7,7 @@ export function AppLogo(props: SVGProps<SVGSVGElement>) {
       viewBox="0 0 200 50"
       width="150"
       height="37.5"
-      aria-label="Jumbo Dispatch Tracker Logo"
+      aria-label="SLR Dispatch Tracker Logo"
       {...props}
     >
       <rect width="200" height="50" rx="5" ry="5" fill="hsl(var(--primary))" />
@@ -33,7 +33,7 @@ export function AppLogo(props: SVGProps<SVGSVGElement>) {
         fill="hsl(var(--primary-foreground))"
         opacity="0.8"
       >
-        Jumbo Dispatch Tracker
+        SLR Dispatch Tracker
       </text>
     </svg>
   );

@@ -3,7 +3,7 @@ import { CoordinatorDashboardClient } from './components/coordinator-dashboard-c
 import { Users } from 'lucide-react';
 
 export const metadata = {
-  title: 'Coordinator Dashboard | Jumbo Dispatch Tracker',
+  title: 'Coordinator Dashboard | SLR Dispatch Tracker',
 };
 
 // This page itself is a Server Component.

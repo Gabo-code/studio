@@ -22,8 +22,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Jumbo Dispatch Tracker',
-  description: 'Track driver check-ins and dispatches for Jumbo deliveries.',
+  title: 'SLR Dispatch Tracker',
+  description: 'Track driver check-ins and dispatches for SLR deliveries.',
 };
 
 export default function RootLayout({

@@ -72,7 +72,7 @@ export function LocationMap({ onLocationVerified, onLocationUpdate }: LocationMa
       }).addTo(map);
 
       L.marker(jumboLocation).addTo(map)
-        .bindPopup('Ubicación de la tienda Jumbo')
+        .bindPopup('Ubicación de la tienda SLR')
         .openPopup();
 
       L.circle(jumboLocation, {
