@@ -1,7 +1,5 @@
 // @ts-nocheck
-import { PageHeader } from '@/components/shared/page-header';
 import { CoordinatorDashboardClient } from './components/coordinator-dashboard-client';
-import { Users } from 'lucide-react';
 
 export const metadata = {
   title: 'Coordinator Dashboard | SLR Dispatch Tracker',
@@ -12,10 +10,6 @@ export const metadata = {
 export default function CoordinatorDashboardPage() {
   return (
     <div className="container mx-auto py-8 px-4">
-      <PageHeader 
-        Icon={Users}
-        showLogo={true}
-      />
       <CoordinatorDashboardClient />
     </div>
   );
