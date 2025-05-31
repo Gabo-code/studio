@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { User, Clock, Check, Car, Bike, Eye } from 'lucide-react';
+import { User, Clock, Check, Car, Bike, Eye, CheckCircle, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   Dialog,
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from '@/components/ui/badge';
 
 // Nueva interfaz para los conductores activos
 interface DriverRecord {
@@ -30,6 +31,7 @@ interface DriverRecord {
   selfie_url?: string;
   pid?: string;
   vehicle_type?: string;
+  ssl?: number;
 }
 
 interface DriverQueueProps {
